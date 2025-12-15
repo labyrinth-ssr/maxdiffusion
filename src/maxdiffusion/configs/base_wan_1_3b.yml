@@ -272,7 +272,7 @@ enable_jax_named_scopes: False
 # Generation parameters
 prompt: "A curious raccoon"
 prompt_2: "A cat and a dog baking a cake together in a kitchen. The cat is carefully measuring flour, while the dog is stirring the batter with a wooden spoon. The kitchen is cozy, with sunlight streaming through the window."
-negative_prompt: ""
+negative_prompt: "blurry, low quality"
 do_classifier_free_guidance: True
 height: 300
 width: 300
