@@ -27,7 +27,8 @@ from ... import max_logging
 from ... import max_utils
 from ...max_utils import get_flash_block_sizes, get_precision, device_put_replicated
 from ...models.wan.wan_utils import load_wan_transformer, load_wan_vae
-from ...models.wan.transformers.transformer_wan import WanModel
+from ...models.wan.transformers.my_transformer_wan import WanModelAdapter as WanModel
+# from ...models.wan.transformers.transformer_wan import WanModel  # Original
 from ...models.wan.autoencoder_kl_wan import AutoencoderKLWan, AutoencoderKLWanCache
 from maxdiffusion.video_processor import VideoProcessor
 from ...schedulers.scheduling_unipc_multistep_flax import FlaxUniPCMultistepScheduler, UniPCMultistepSchedulerState
@@ -101,6 +102,21 @@ def create_sharded_logical_transformer(
     wan_config = restored_checkpoint["wan_config"]
   else:
     wan_config = WanModel.load_config(config.pretrained_model_name_or_path, subfolder="transformer")
+
+  # Check if we should use custom weight loader
+  if '_load_from_pretrained' in wan_config and not restored_checkpoint:
+    from ...models.wan.transformers import my_transformer_wan_load
+    pretrained_path = wan_config.pop('_load_from_pretrained')
+    cfg = wan_config['cfg']
+    max_logging.log(f"Loading custom WAN transformer from {pretrained_path}")
+    wan_dit_model = my_transformer_wan_load.create_model_from_safe_tensors(
+        pretrained_path,
+        cfg,
+        mesh=mesh
+    )
+    # Wrap in adapter
+    return WanModel(pretrained_model=wan_dit_model)
+
   wan_config["mesh"] = mesh
   wan_config["dtype"] = config.activations_dtype
   wan_config["weights_dtype"] = config.weights_dtype
