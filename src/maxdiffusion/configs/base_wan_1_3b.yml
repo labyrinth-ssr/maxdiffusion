@@ -236,7 +236,7 @@ seed: 0
 output_dir: "sdxl-model-finetuned"
 per_device_batch_size: 1.0
 # If global_batch_size % jax.device_count is not 0, use FSDP sharding.
-global_batch_size: 0
+global_batch_size: 1
 
 # For creating tfrecords from dataset
 tfrecords_dir: ""

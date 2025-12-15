@@ -416,7 +416,7 @@ class WanModel(nnx.Module, FlaxModelMixin, ConfigMixin):
       text_dim: int = 4096,
       freq_dim: int = 256,
       ffn_dim: int = 13824,
-      num_layers: int = 40,
+      num_layers: int = 30,
       dropout: float = 0.0,
       cross_attn_norm: bool = True,
       qk_norm: Optional[str] = "rms_norm_across_heads",
