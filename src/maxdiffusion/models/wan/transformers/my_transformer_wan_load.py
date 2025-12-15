@@ -15,6 +15,7 @@
 """Weight loading utilities for Wan2.1-T2V-1.3B model."""
 
 import gc
+import os
 import re
 from enum import Enum
 
@@ -23,6 +24,7 @@ import jax.numpy as jnp
 import safetensors
 from etils import epath
 from flax import nnx
+from huggingface_hub import snapshot_download
 
 from . import my_transformer_wan as model_lib
 
@@ -179,16 +181,31 @@ def create_model_from_safe_tensors(
     Load Wan2.1-T2V-1.3B DiT model from safetensors checkpoint.
 
     Args:
-        file_dir: Directory containing .safetensors files or path to transformer directory
+        file_dir: HuggingFace model ID (e.g., "Wan-AI/Wan2.1-T2V-1.3B-Diffusers")
+                  OR local directory containing .safetensors files
         cfg: Model configuration
         mesh: Optional JAX mesh for sharding
-        load_transformer_only: If True, only load transformer weights (not VAE/text encoder)
 
     Returns:
         Wan2DiT model with loaded weights
     """
+    # Check if input is local directory or HuggingFace model ID
+    if os.path.isdir(file_dir):
+        # Local directory: use directly
+        print(f"Loading from local directory: {file_dir}")
+        local_dir = file_dir
+    else:
+        # HuggingFace model ID: download entire repo
+        print(f"Downloading model from HuggingFace: {file_dir}")
+        local_dir = snapshot_download(
+            repo_id=file_dir,
+            allow_patterns=["transformer/*.safetensors"],  # Only download transformer weights
+            cache_dir=None,  # Use default cache: ~/.cache/huggingface/hub/
+        )
+        print(f"Downloaded to: {local_dir}")
+
     # Check if file_dir is the model root or transformer subdirectory
-    file_path = epath.Path(file_dir).expanduser()
+    file_path = epath.Path(local_dir).expanduser()
     transformer_path = file_path / "transformer"
 
     if transformer_path.exists():
@@ -201,7 +218,7 @@ def create_model_from_safe_tensors(
             files = sorted(list(file_path.glob("*.safetensors")))
 
     if not files:
-        raise ValueError(f"No safetensors found in {file_dir} or {file_dir}/transformer")
+        raise ValueError(f"No safetensors found in {local_dir} or {local_dir}/transformer")
 
     print(f"Found {len(files)} DiT transformer safetensors file(s)")
 
