@@ -40,6 +40,23 @@ from ...gradient_checkpoint import GradientCheckpointType
 BlockSizes = common_types.BlockSizes
 
 
+def _log_stats(name: str, tensor: jax.Array, step_state: dict, enabled: bool):
+  """Emit deterministic debug stats with a running order index."""
+  if not enabled:
+    return
+  idx = step_state["i"]
+  step_state["i"] += 1
+  jax.debug.print(
+      "[{idx}] {name}: shape={shape}, min={min}, max={max}, mean={mean}",
+      idx=idx,
+      name=name,
+      shape=tensor.shape,
+      min=jnp.min(tensor),
+      max=jnp.max(tensor),
+      mean=jnp.mean(tensor),
+  )
+
+
 def get_frequencies(max_seq_len: int, theta: int, attention_head_dim: int):
   h_dim = w_dim = 2 * (attention_head_dim // 6)
   t_dim = attention_head_dim - h_dim - w_dim
@@ -553,7 +570,9 @@ class WanModel(nnx.Module, FlaxModelMixin, ConfigMixin):
       attention_kwargs: Optional[Dict[str, Any]] = None,
       deterministic: bool = True,
       rngs: nnx.Rngs = None,
+      debug: bool = False,
   ) -> Union[jax.Array, Dict[str, jax.Array]]:
+    step_state = {"i": 0}
     hidden_states = nn.with_logical_constraint(hidden_states, ("batch", None, None, None, None))
     batch_size, _, num_frames, height, width = hidden_states.shape
     p_t, p_h, p_w = self.config.patch_size
@@ -561,16 +580,21 @@ class WanModel(nnx.Module, FlaxModelMixin, ConfigMixin):
     post_patch_height = height // p_h
     post_patch_width = width // p_w
 
+    _log_stats("input", hidden_states, step_state, debug)
     hidden_states = jnp.transpose(hidden_states, (0, 2, 3, 4, 1))
     rotary_emb = self.rope(hidden_states)
 
     hidden_states = self.patch_embedding(hidden_states)
     hidden_states = jax.lax.collapse(hidden_states, 1, -1)
+    _log_stats("patch_embedding", hidden_states, step_state, debug)
 
     temb, timestep_proj, encoder_hidden_states, encoder_hidden_states_image = self.condition_embedder(
         timestep, encoder_hidden_states, encoder_hidden_states_image
     )
     timestep_proj = timestep_proj.reshape(timestep_proj.shape[0], 6, -1)
+    _log_stats("time_embed", temb, step_state, debug)
+    _log_stats("time_proj", timestep_proj, step_state, debug)
+    _log_stats("text_embed", encoder_hidden_states, step_state, debug)
 
     if encoder_hidden_states_image is not None:
       raise NotImplementedError("img2vid is not yet implemented.")
@@ -597,8 +621,9 @@ class WanModel(nnx.Module, FlaxModelMixin, ConfigMixin):
       )(initial_carry, self.blocks)
 
       hidden_states, _ = final_carry
+      _log_stats("blocks_out", hidden_states, step_state, debug)
     else:
-      for block in self.blocks:
+      for block_idx, block in enumerate(self.blocks):
 
         def layer_forward(hidden_states):
           return block(hidden_states, encoder_hidden_states, timestep_proj, rotary_emb, deterministic, rngs)
@@ -607,12 +632,14 @@ class WanModel(nnx.Module, FlaxModelMixin, ConfigMixin):
             layer_forward, self.names_which_can_be_saved, self.names_which_can_be_offloaded, prevent_cse=not self.scan_layers
         )
         hidden_states = rematted_layer_forward(hidden_states)
+        _log_stats(f"block_{block_idx}_out", hidden_states, step_state, debug)
 
     shift, scale = jnp.split(self.scale_shift_table + jnp.expand_dims(temb, axis=1), 2, axis=1)
     with self.conditional_named_scope("output_norm"):
       hidden_states = (self.norm_out(hidden_states.astype(jnp.float32)) * (1 + scale) + shift).astype(hidden_states.dtype)
     with self.conditional_named_scope("output_proj"):
       hidden_states = self.proj_out(hidden_states)
+    _log_stats("post_proj", hidden_states, step_state, debug)
 
     hidden_states = hidden_states.reshape(
         batch_size, post_patch_num_frames, post_patch_height, post_patch_width, p_t, p_h, p_w, -1
@@ -621,4 +648,5 @@ class WanModel(nnx.Module, FlaxModelMixin, ConfigMixin):
     hidden_states = jax.lax.collapse(hidden_states, 6, None)
     hidden_states = jax.lax.collapse(hidden_states, 4, 6)
     hidden_states = jax.lax.collapse(hidden_states, 2, 4)
+    _log_stats("unpatchify", hidden_states, step_state, debug)
     return hidden_states

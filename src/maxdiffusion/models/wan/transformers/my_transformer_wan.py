@@ -36,6 +36,24 @@ from flax import nnx
 from jax.lax import Precision
 from jaxtyping import Array
 
+
+def _log_stats(name: str, tensor: Array, step_state: dict, enabled: bool):
+    """Emit deterministic debug stats with a running order index."""
+    if not enabled:
+        return
+    idx = step_state["i"]
+    step_state["i"] += 1
+    jax.debug.print(
+        "[{idx}] {name}: shape={shape}, min={min}, max={max}, mean={mean}",
+        idx=idx,
+        name=name,
+        shape=tensor.shape,
+        min=jnp.min(tensor),
+        max=jnp.max(tensor),
+        mean=jnp.mean(tensor),
+    )
+
+
 @dataclasses.dataclass(frozen=True)
 class TransformerWanModelConfig:
     """Configuration for Wan2.1-T2V-1.3B Diffusion Transformer."""
@@ -365,7 +383,14 @@ class Wan2DiT(nnx.Module):
 
     @jax.named_scope("wan2_dit")
     # @jax.jit
-    def forward(self, latents: Array, text_embeds: Array, timestep: Array, deterministic: bool = True) -> Array:
+    def forward(
+        self,
+        latents: Array,
+        text_embeds: Array,
+        timestep: Array,
+        deterministic: bool = True,
+        debug: bool = False,
+    ) -> Array:
         """
         Forward pass of the Diffusion Transformer.
 
@@ -378,16 +403,24 @@ class Wan2DiT(nnx.Module):
         Returns:
             predicted_noise: [B, T, H, W, C] predicted noise
         """
+        step_state = {"i": 0}
+        _log_stats("input_latents", latents, step_state, debug)
+        _log_stats("input_text", text_embeds, step_state, debug)
+        _log_stats("input_timestep", timestep, step_state, debug)
         text_embeds = self.text_proj(text_embeds)
+        _log_stats("text_proj", text_embeds, step_state, debug)
 
         # Get time embeddings
         # time_emb: [B, D] for FinalLayer
         # time_proj: [B, 6*D] for AdaLN in blocks
         time_emb, time_proj = self.time_embed(timestep)
+        _log_stats("time_emb", time_emb, step_state, debug)
+        _log_stats("time_proj", time_proj, step_state, debug)
 
         x = self.patch_embed(latents)
         b, t_out, h_out, w_out, d = x.shape
         x = x.reshape(b, t_out * h_out * w_out, d)
+        _log_stats("patch_embed", x, step_state, debug)
 
         grid_sizes = (t_out, h_out, w_out)
 
@@ -396,14 +429,17 @@ class Wan2DiT(nnx.Module):
             jax.lax.stop_gradient(arr) for arr in precompute_freqs_cis_3d(dim=self.cfg.head_dim, max_seq_len=max_seq)
         )
 
-        for block in self.blocks:
+        for block_idx, block in enumerate(self.blocks):
             x = block(x, text_embeds, time_proj, rope_state=(rope_freqs, grid_sizes), deterministic=deterministic)
+            _log_stats(f"block_{block_idx}_out", x, step_state, debug)
 
         # Final projection to noise space
         x = self.final_layer(x, time_emb)  # [B, T*H*W, latent_output_dim]
+        _log_stats("final_layer", x, step_state, debug)
 
         # Reshape back to video format
         predicted_noise = self.unpatchify(x, grid_sizes)
+        _log_stats("unpatchify", predicted_noise, step_state, debug)
 
         return predicted_noise
 
@@ -494,7 +530,7 @@ class WanModelAdapter(nnx.Module):
             '_load_from_pretrained': pretrained_model_name_or_path,  # Pass path for later loading
         }
 
-    def __call__(self, hidden_states: Array, timestep: Array, encoder_hidden_states: Array) -> Array:
+    def __call__(self, hidden_states: Array, timestep: Array, encoder_hidden_states: Array, debug: bool = False) -> Array:
         """
         Pipeline-compatible interface.
 
@@ -510,7 +546,7 @@ class WanModelAdapter(nnx.Module):
         latents = jnp.transpose(hidden_states, (0, 2, 3, 4, 1))  # [B, T, H, W, C]
 
         # Forward pass
-        noise_pred = self.model.forward(latents, encoder_hidden_states, timestep, deterministic=True)
+        noise_pred = self.model.forward(latents, encoder_hidden_states, timestep, deterministic=True, debug=debug)
 
         # Convert back to channel-first
         noise_pred = jnp.transpose(noise_pred, (0, 4, 1, 2, 3))  # [B, C, T, H, W]
