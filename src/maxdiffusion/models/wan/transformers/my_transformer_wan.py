@@ -59,6 +59,8 @@ class TransformerWanModelConfig:
     """Configuration for Wan2.1-T2V-1.3B Diffusion Transformer."""
 
     weights_dtype: jnp.dtype = jnp.bfloat16
+    dtype: jnp.dtype = jnp.bfloat16
+    precision = Precision.HIGHEST
     num_layers: int = 30
     hidden_dim: int = 1536
     latent_input_dim: int = 16
@@ -362,17 +364,18 @@ class Wan2DiT(nnx.Module):
             out_features=cfg.hidden_dim,
             kernel_size=(1, 2, 2),
             strides=(1, 2, 2),
-            padding="VALID",
-            use_bias=True,
+            dtype=cfg.dtype,
             rngs=rngs,
-            precision=Precision.HIGHEST,
+            param_dtype=cfg.weights_dtype,
+            precision=cfg.precision,
+            kernel_init=nnx.initializers.xavier_uniform()
         )
 
         # Text embedding projection: UMT5 (4096) → DiT (1536)
         self.text_proj = nnx.Sequential(
-            nnx.Linear(cfg.text_embed_dim, cfg.hidden_dim, rngs=rngs, precision=Precision.HIGHEST),
+            nnx.Linear(cfg.text_embed_dim, cfg.hidden_dim, rngs=rngs, precision=cfg.precision),
             nnx.gelu,
-            nnx.Linear(cfg.hidden_dim, cfg.hidden_dim, rngs=rngs, precision=Precision.HIGHEST),
+            nnx.Linear(cfg.hidden_dim, cfg.hidden_dim, rngs=rngs, precision=cfg.precision),
         )
 
         self.time_embed = TimestepEmbedding(cfg, rngs=rngs)
