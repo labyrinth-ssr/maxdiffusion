@@ -9,7 +9,6 @@ run: |
   rm -rf maxdiffusion
   git clone https://github.com/labyrinth-ssr/maxdiffusion.git
   cd maxdiffusion && git checkout test-ref
-  git checkout f7551dd9641d75b9519fead626f89aa446286970
   yes | bash setup.sh MODE=stable DEVICE=tpu
   source ~/maxdiffusion_venv/bin/activate
   bash setup.sh MODE=stable DEVICE=tpu
