@@ -50,7 +50,7 @@ replicate_vae: False
 # at the cost of time.
 precision: "DEFAULT"
 # Use jax.lax.scan for transformer layers
-scan_layers: True
+scan_layers: False
 
 # if False state is not jitted and instead replicate is called. This is good for debugging on single host
 # It must be True for multi-host.

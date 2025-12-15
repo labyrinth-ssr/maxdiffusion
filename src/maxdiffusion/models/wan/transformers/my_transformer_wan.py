@@ -343,7 +343,7 @@ class FinalLayer(nnx.Module):
         # [B, D] → [B, 1, D] + [1, 2, D] → [B, 2, D]
         e = self.scale_shift_table.value + time_emb[:, None, :]
         shift, scale = e[:, 0, :], e[:, 1, :]
-
+        x = self.norm(x)
         x = modulate(x, shift[:, None, :], scale[:, None, :])
         x = self.linear(x)
         return x
