@@ -89,7 +89,7 @@ def get_key_and_value(pt_tuple_key, tensor, flax_state_dict, random_flax_state_d
       if flax_key in flax_state_dict:
         new_tensor = flax_state_dict[flax_key]
       else:
-        new_tensor = jnp.zeros((40,) + flax_tensor.shape)
+        new_tensor = jnp.zeros((30,) + flax_tensor.shape)
       flax_tensor = new_tensor.at[block_index].set(flax_tensor)
   return flax_key, flax_tensor
 
@@ -99,7 +99,7 @@ def load_fusionx_transformer(
     eval_shapes: dict,
     device: str,
     hf_download: bool = True,
-    num_layers: int = 40,
+    num_layers: int = 30,
     scan_layers: bool = True,
 ):
   device = jax.local_devices(backend=device)[0]
@@ -142,7 +142,7 @@ def load_causvid_transformer(
     eval_shapes: dict,
     device: str,
     hf_download: bool = True,
-    num_layers: int = 40,
+    num_layers: int = 30,
     scan_layers: bool = True,
 ):
   device = jax.local_devices(backend=device)[0]
@@ -182,7 +182,7 @@ def load_wan_transformer(
     eval_shapes: dict,
     device: str,
     hf_download: bool = True,
-    num_layers: int = 40,
+    num_layers: int = 30,
     scan_layers: bool = True,
     subfolder: str = "",
 ):
@@ -202,7 +202,7 @@ def load_base_wan_transformer(
     eval_shapes: dict,
     device: str,
     hf_download: bool = True,
-    num_layers: int = 40,
+    num_layers: int = 30,
     scan_layers: bool = True,
     subfolder: str = "",
 ):
