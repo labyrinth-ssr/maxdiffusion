@@ -664,7 +664,7 @@ def transformer_forward_pass(
     guidance_scale,
 ):
   wan_transformer = nnx.merge(graphdef, sharded_state, rest_of_state)
-  noise_pred = wan_transformer(hidden_states=latents, timestep=timestep, encoder_hidden_states=prompt_embeds)
+  noise_pred = wan_transformer(hidden_states=latents, timestep=timestep, encoder_hidden_states=prompt_embeds, debug=True)
   if do_classifier_free_guidance:
     bsz = latents.shape[0] // 2
     noise_uncond = noise_pred[bsz:]
