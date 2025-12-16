@@ -586,8 +586,8 @@ class WanVAEDecoder(nnx.Module):
         """
         # # Step 1: Denormalize
         # # DEBUG: Input latents
-        jax.debug.print("[VAE_WAN DECODE] Input latents: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       latents.shape, jnp.min(latents), jnp.max(latents), jnp.mean(latents), ordered=True)
+        # jax.debug.print("[VAE_WAN DECODE] Input latents: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    latents.shape, jnp.min(latents), jnp.max(latents), jnp.mean(latents), ordered=True)
 
         # # Convert Python tuples to JAX arrays at runtime (JIT treats them as static constants)
         # latent_mean = jnp.array(self.latent_mean_tuple).reshape(1, 1, 1, 1, 16)
@@ -610,7 +610,7 @@ class WanVAEDecoder(nnx.Module):
         # Add singleton time dimension for each frame: [T, B, 1, H, W, C]
         z_frames = z_frames[:, :, None, :, :, :]
 
-        jax.debug.print("z_frames has nan:{}", jnp.isnan(z_frames).any())
+        # jax.debug.print("z_frames has nan:{}", jnp.isnan(z_frames).any())
 
         # Warm-up pass: process first frame to initialize cache with correct shapes
         # This ensures consistent pytree structure for jax.lax.scan
@@ -628,10 +628,10 @@ class WanVAEDecoder(nnx.Module):
             frame_out, new_cache_tuple = self.decoder(frame_latent, cache_tuple, cache_idx)
             # num_arrays = sum(isinstance(x, jnp.ndarray) for x in new_cache_tuple)
             # num_nones = sum(x is None for x in new_cache_tuple)
-            jax.debug.print("new cache Arrays: {},cache Nones: {}", num_arrays, num_nones)
-            jax.debug.print("frame_out shape:{}", frame_out.shape)
+            # jax.debug.print("new cache Arrays: {},cache Nones: {}", num_arrays, num_nones)
+            # jax.debug.print("frame_out shape:{}", frame_out.shape)
             # right_part_frame = frame_out[:, :, :, 235:, :]
-            jax.debug.print("frame_out Has NaN: {}", jnp.isnan(right_part_frame).any())
+            # jax.debug.print("frame_out Has NaN: {}", jnp.isnan(right_part_frame).any())
             return new_cache_tuple, frame_out
 
         # Process remaining frames with JIT
