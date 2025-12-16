@@ -59,6 +59,8 @@ class TransformerWanModelConfig:
     """Configuration for Wan2.1-T2V-1.3B Diffusion Transformer."""
 
     weights_dtype: jnp.dtype = jnp.bfloat16
+    dtype: jnp.dtype = jnp.bfloat16
+    precision = Precision.HIGHEST
     num_layers: int = 30
     hidden_dim: int = 1536
     latent_input_dim: int = 16
@@ -288,6 +290,7 @@ class WanAttentionBlock(nnx.Module):
         Returns:
             [B, N, D] transformed tokens
         """
+        # step_state = {"i": 0}
         # Get modulation from time embedding
         b = time_proj.shape[0]
         d = self.cfg.hidden_dim
@@ -299,20 +302,28 @@ class WanAttentionBlock(nnx.Module):
         # Self-attention with AdaLN modulation and RoPE
         norm_x = self.norm1(x)
         norm_x = modulate(norm_x, shift_msa[:, None, :], scale_msa[:, None, :])
+        # _log_stats("wan_block_norm1", norm_x, step_state, True)
         attn_out = self.self_attn(norm_x, rope_state=rope_state, deterministic=deterministic)
+        # _log_stats("wan_block_attn_out", attn_out, step_state, True)
         x = (x.astype(jnp.float32) + gate_msa[:, None, :] * attn_out).astype(x.dtype)
+        # _log_stats("wan_block_post_attn", x, step_state, True)
 
         # Cross-attention
         norm_x = self.norm2(x)
+        # _log_stats("wan_block_norm2", norm_x, step_state, True)
         cross_out = self.cross_attn(norm_x, text_embeds, deterministic=deterministic)
+        # _log_stats("wan_block_cross_out", cross_out, step_state, True)
         x = x + cross_out
+        # _log_stats("wan_block_post_cross_attn", x, step_state, True)
 
         # MLP with AdaLN modulation
         norm_x = self.norm3(x)
         norm_x = modulate(norm_x, shift_mlp[:, None, :], scale_mlp[:, None, :])
+        # _log_stats("wan_block_norm3", norm_x, step_state, True)
         mlp_out = self.mlp(norm_x)
+        # _log_stats("wan_block_mlp_out", mlp_out, step_state, True)
         x = (x.astype(jnp.float32) + gate_mlp[:, None, :] * mlp_out).astype(jnp.float32)
-
+        # _log_stats("wan_block_post_mlp", x, step_state, True)
         return x
 
 
@@ -341,7 +352,7 @@ class FinalLayer(nnx.Module):
         # [B, D] → [B, 1, D] + [1, 2, D] → [B, 2, D]
         e = self.scale_shift_table.value + time_emb[:, None, :]
         shift, scale = e[:, 0, :], e[:, 1, :]
-
+        x = self.norm(x)
         x = modulate(x, shift[:, None, :], scale[:, None, :])
         x = self.linear(x)
         return x
@@ -362,17 +373,18 @@ class Wan2DiT(nnx.Module):
             out_features=cfg.hidden_dim,
             kernel_size=(1, 2, 2),
             strides=(1, 2, 2),
-            padding="VALID",
-            use_bias=True,
+            dtype=cfg.dtype,
             rngs=rngs,
-            precision=Precision.HIGHEST,
+            param_dtype=cfg.weights_dtype,
+            precision=cfg.precision,
+            kernel_init=nnx.initializers.xavier_uniform()
         )
 
         # Text embedding projection: UMT5 (4096) → DiT (1536)
         self.text_proj = nnx.Sequential(
-            nnx.Linear(cfg.text_embed_dim, cfg.hidden_dim, rngs=rngs, precision=Precision.HIGHEST),
+            nnx.Linear(cfg.text_embed_dim, cfg.hidden_dim, rngs=rngs, precision=cfg.precision),
             nnx.gelu,
-            nnx.Linear(cfg.hidden_dim, cfg.hidden_dim, rngs=rngs, precision=Precision.HIGHEST),
+            nnx.Linear(cfg.hidden_dim, cfg.hidden_dim, rngs=rngs, precision=cfg.precision),
         )
 
         self.time_embed = TimestepEmbedding(cfg, rngs=rngs)
