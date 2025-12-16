@@ -734,7 +734,7 @@ class WanVAEAdapter(nnx.Module):
         self.latents_mean = _cfg.latent_mean  # Tuple of 16 floats
         self.latents_std = _cfg.latent_std    # Tuple of 16 floats
         self.z_dim = 16  # Latent dimension
-        self.temperal_downsample = [True, True]  # 2x temporal downsampling: 81 -> 21
+        self.temperal_downsample = [False, True, True]  # 2x temporal downsampling: 81 -> 21
 
     def decode(self, latents: Array, cache=None) -> tuple:
         """
