@@ -584,15 +584,16 @@ class WanVAEDecoder(nnx.Module):
             video: [B, T_out, H_out, W_out, 3] RGB video (values in [-1, 1])
                   e.g., [1, 81, 832, 480, 3]
         """
-        # Step 1: Denormalize
-        # DEBUG: Input latents
-        jax.debug.print("[VAE_WAN DECODE] Input latents: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       latents.shape, jnp.min(latents), jnp.max(latents), jnp.mean(latents), ordered=True)
+        # # Step 1: Denormalize
+        # # DEBUG: Input latents
+        # jax.debug.print("[VAE_WAN DECODE] Input latents: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+        #                latents.shape, jnp.min(latents), jnp.max(latents), jnp.mean(latents), ordered=True)
 
-        # Convert Python tuples to JAX arrays at runtime (JIT treats them as static constants)
-        latent_mean = jnp.array(self.latent_mean_tuple).reshape(1, 1, 1, 1, 16)
-        latent_std = jnp.array(self.latent_std_tuple).reshape(1, 1, 1, 1, 16)
-        z = latents * latent_std + latent_mean
+        # # Convert Python tuples to JAX arrays at runtime (JIT treats them as static constants)
+        # latent_mean = jnp.array(self.latent_mean_tuple).reshape(1, 1, 1, 1, 16)
+        # latent_std = jnp.array(self.latent_std_tuple).reshape(1, 1, 1, 1, 16)
+        # z = latents * latent_std + latent_mean
+        z = latents
 
         # DEBUG: After denormalization
         jax.debug.print("[VAE_WAN DECODE] After denormalization: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
@@ -754,16 +755,16 @@ class WanVAEAdapter(nnx.Module):
 
         assert latents.shape[-1] == self.z_dim, f"Expected latent dim {self.z_dim}, got {latents.shape[-1]}"
 
-        # Custom VAE does denormalization internally, but pipeline expects to do it
-        # So we need to RE-normalize before passing to decoder (which will denormalize again)
-        latent_mean = jnp.array(self.latents_mean).reshape(1, 1, 1, 1, 16)
-        latent_std = jnp.array(self.latents_std).reshape(1, 1, 1, 1, 16)
+        # # Custom VAE does denormalization internally, but pipeline expects to do it
+        # # So we need to RE-normalize before passing to decoder (which will denormalize again)
+        # latent_mean = jnp.array(self.latents_mean).reshape(1, 1, 1, 1, 16)
+        # latent_std = jnp.array(self.latents_std).reshape(1, 1, 1, 1, 16)
 
-        # Reverse the pipeline's denormalization: z_normalized = (z_denormalized - mean) / std
-        latents_normalized = (latents - latent_mean) / latent_std
+        # # Reverse the pipeline's denormalization: z_normalized = (z_denormalized - mean) / std
+        # latents_normalized = (latents - latent_mean) / latent_std
 
         # Decode (decoder will denormalize internally)
-        video = self.decoder.decode(latents_normalized)
+        video = self.decoder.decode(latents)
 
         # Return in format expected by pipeline: (video, None)
         return (video, None)
