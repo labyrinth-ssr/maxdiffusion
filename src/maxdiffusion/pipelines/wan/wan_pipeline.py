@@ -27,8 +27,8 @@ from ... import max_logging
 from ... import max_utils
 from ...max_utils import get_flash_block_sizes, get_precision, device_put_replicated
 from ...models.wan.wan_utils import load_wan_transformer, load_wan_vae
-from ...models.wan.transformers.my_transformer_wan import WanModelAdapter as WanModel
-# from ...models.wan.transformers.transformer_wan import WanModel  # Original
+# from ...models.wan.transformers.my_transformer_wan import WanModelAdapter as WanModel
+from ...models.wan.transformers.transformer_wan import WanModel  # Original
 from ...models.wan.autoencoder_kl_wan import AutoencoderKLWan, AutoencoderKLWanCache
 from maxdiffusion.video_processor import VideoProcessor
 from ...schedulers.scheduling_unipc_multistep_flax import FlaxUniPCMultistepScheduler, UniPCMultistepSchedulerState
