@@ -24,9 +24,7 @@ import safetensors
 from etils import epath
 from flax import nnx
 
-# from bonsai.models.wan2 import transformer_wan as model_lib
 from . import umt5 as t5_lib
-# from bonsai.models.wan2 import vae_wan as vae_lib
 
 
 def cast_with_exclusion(path, x, dtype_to_cast):
@@ -96,127 +94,6 @@ def _stoi(s):
         return int(s)
     except ValueError:
         return s
-
-def create_model_from_safe_tensors(
-    file_dir: str,
-    cfg: model_lib.TransformerWanModelConfig,
-    mesh: jax.sharding.Mesh | None = None,
-) -> model_lib.Wan2DiT:
-    """
-    Load Wan2.1-T2V-1.3B DiT model from safetensors checkpoint.
-
-    Args:
-        file_dir: Directory containing .safetensors files or path to transformer directory
-        cfg: Model configuration
-        mesh: Optional JAX mesh for sharding
-        load_transformer_only: If True, only load transformer weights (not VAE/text encoder)
-
-    Returns:
-        Wan2DiT model with loaded weights
-    """
-    # Check if file_dir is the model root or transformer subdirectory
-    file_path = epath.Path(file_dir).expanduser()
-    transformer_path = file_path / "transformer"
-
-    if transformer_path.exists():
-        # Look in transformer subdirectory
-        files = sorted(list(transformer_path.glob("diffusion_pytorch_model-*.safetensors")))
-    else:
-        # Look in provided directory
-        files = sorted(list(file_path.glob("diffusion_pytorch_model-*.safetensors")))
-        if not files:
-            files = sorted(list(file_path.glob("*.safetensors")))
-
-    if not files:
-        raise ValueError(f"No safetensors found in {file_dir} or {file_dir}/transformer")
-
-    print(f"Found {len(files)} DiT transformer safetensors file(s)")
-
-    # Create model structure
-    wan2_dit = nnx.eval_shape(lambda: model_lib.Wan2DiT(cfg, rngs=nnx.Rngs(params=0)))
-    graph_def, abs_state = nnx.split(wan2_dit)
-    state_dict = abs_state.to_pure_dict()
-
-    # Setup sharding if mesh provided
-    sharding = nnx.get_named_sharding(abs_state, mesh).to_pure_dict() if mesh is not None else None
-
-    key_mapping = _get_dit_mapping(cfg)
-    conversion_errors = []
-    loaded_keys = []
-    skipped_keys = []
-
-    # Collect K/V weights for fusion into kv_proj
-    kv_weights = {}  # {block_idx: {'k_weight': ..., 'k_bias': ..., 'v_weight': ..., 'v_bias': ...}}
-
-    for f in files:
-        print(f"Loading weights from {f.name}...")
-        with safetensors.safe_open(f, framework="numpy") as sf:
-            for torch_key in sf.keys():
-                tensor = sf.get_tensor(torch_key)
-
-                # Special handling for cross-attention K/V fusion
-                kv_match = re.match(r"blocks\.([0-9]+)\.attn2\.to_([kv])\.(weight|bias)", torch_key)
-                if kv_match:
-                    block_idx = int(kv_match.group(1))
-                    kv_type = kv_match.group(2)  # 'k' or 'v'
-                    param_type = kv_match.group(3)  # 'weight' or 'bias'
-
-                    if block_idx not in kv_weights:
-                        kv_weights[block_idx] = {}
-                    kv_weights[block_idx][f"{kv_type}_{param_type}"] = tensor
-                    loaded_keys.append(torch_key)
-                    continue
-
-                jax_key, transform = _torch_key_to_jax_key(key_mapping, torch_key)
-
-                if jax_key is None:
-                    # Skip keys not in our mapping (e.g., VAE, text encoder, attn2.norm_k)
-                    skipped_keys.append(torch_key)
-                    continue
-
-                keys = [_stoi(k) for k in jax_key.split(".")]
-                try:
-                    _assign_weights(keys, tensor, state_dict, torch_key, transform, sharding)
-                    loaded_keys.append(torch_key)
-                except Exception as e:
-                    full_jax_key = ".".join([str(k) for k in keys])
-                    conversion_errors.append(
-                        f"Failed to assign '{torch_key}' to '{full_jax_key}': {type(e).__name__}: {e}"
-                    )
-        gc.collect()
-
-    # Fuse collected K/V weights into kv_proj
-    import jax.numpy as jnp
-
-    for block_idx, weights in kv_weights.items():
-        if all(k in weights for k in ["k_weight", "k_bias", "v_weight", "v_bias"]):
-            # Transpose and concatenate: (out, in) -> (in, out) then concat -> (in, 2*out)
-            k_weight = weights["k_weight"].T  # (in, out)
-            v_weight = weights["v_weight"].T  # (in, out)
-            kv_kernel = jnp.concatenate([k_weight, v_weight], axis=1)  # (in, 2*out)
-
-            kv_bias = jnp.concatenate([weights["k_bias"], weights["v_bias"]])  # (2*out,)
-
-            # Assign to state dict
-            state_dict["blocks"][block_idx]["cross_attn"]["kv_proj"]["kernel"] = jax.device_put(kv_kernel)
-            state_dict["blocks"][block_idx]["cross_attn"]["kv_proj"]["bias"] = jax.device_put(kv_bias)
-
-    print(f"Loaded {len(loaded_keys)} weight tensors")
-    print(f"Skipped {len(skipped_keys)} weight tensors (VAE/text encoder/attn2.norm_k)")
-
-    state_dict = jax.tree_util.tree_map_with_path(
-        lambda path, x: cast_with_exclusion(path, x, dtype_to_cast=cfg.weights_dtype), state_dict
-    )
-
-    if conversion_errors:
-        print(f"\n Warning: {len(conversion_errors)} conversion errors occurred:")
-        for err in conversion_errors:  # Show first 5 errors
-            print(f"  {err}")
-        # if len(conversion_errors) > 5:
-        #     print(f"  ... and {len(conversion_errors) - 5} more")
-
-    gc.collect()
-    return nnx.merge(graph_def, state_dict)
 
 def _get_t5_key_mapping():
     """Define mapping from HuggingFace UMT5 keys to JAX UMT5 keys."""
