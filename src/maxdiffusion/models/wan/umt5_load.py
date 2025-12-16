@@ -15,6 +15,7 @@
 """Weight loading utilities for Wan2.1-T2V-1.3B model."""
 
 import gc
+import os
 import re
 from enum import Enum
 
@@ -22,6 +23,7 @@ import jax
 import jax.numpy as jnp
 import safetensors
 from etils import epath
+from huggingface_hub import snapshot_download
 from flax import nnx
 
 from . import umt5 as t5_lib
@@ -183,6 +185,22 @@ def create_t5_encoder_from_safe_tensors(
     conversion_errors = []
     loaded_keys = []
     skipped_keys = []
+
+    # Check if input is local directory or HuggingFace model ID
+    if os.path.isdir(file_dir):
+        # Local directory: use directly
+        print(f"Loading VAE from local directory: {file_dir}")
+        local_dir = file_dir
+    else:
+        # HuggingFace model ID: download entire repo
+        print(f"Downloading VAE from HuggingFace: {file_dir}")
+        local_dir = snapshot_download(
+            repo_id=file_dir,
+            allow_patterns=["vae/*.safetensors"],  # Only download VAE weights
+            cache_dir=None,  # Use default cache: ~/.cache/huggingface/hub/
+        )
+        print(f"Downloaded to: {local_dir}")
+
 
     # Check if file_dir is the model root or text_encoder subdirectory
     file_path = epath.Path(file_dir).expanduser()
