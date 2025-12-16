@@ -891,6 +891,9 @@ class WanDecoder3d(nnx.Module):
     )
 
   def __call__(self, x: jax.Array, feat_cache=None, feat_idx=[0]):
+    # DEBUG: Decoder input
+    print(f"[DECODER] Input: shape={x.shape}, min={x.min():.4f}, max={x.max():.4f}, mean={x.mean():.4f}")
+
     if feat_cache is not None:
       idx = feat_idx[0]
       cache_x = jnp.copy(x[:, -CACHE_T:, :, :, :])
@@ -903,15 +906,32 @@ class WanDecoder3d(nnx.Module):
     else:
       x = self.conv_in(x)
 
+    # DEBUG: After conv_in
+    print(f"[DECODER] conv_in: shape={x.shape}, min={x.min():.4f}, max={x.max():.4f}, mean={x.mean():.4f}")
+
     ## middle
     x = self.mid_block(x, feat_cache, feat_idx)
+
+    # DEBUG: After mid_block
+    print(f"[DECODER] mid_block: shape={x.shape}, min={x.min():.4f}, max={x.max():.4f}, mean={x.mean():.4f}")
+
     ## upsamples
-    for up_block in self.up_blocks:
+    for block_idx, up_block in enumerate(self.up_blocks):
       x = up_block(x, feat_cache, feat_idx)
+      # DEBUG: After each upsample block
+      print(f"[DECODER] up_block[{block_idx}]: shape={x.shape}, min={x.min():.4f}, max={x.max():.4f}, mean={x.mean():.4f}")
 
     ## head
     x = self.norm_out(x)
+
+    # DEBUG: After norm_out
+    print(f"[DECODER] norm_out: shape={x.shape}, min={x.min():.4f}, max={x.max():.4f}, mean={x.mean():.4f}")
+
     x = self.nonlinearity(x)
+
+    # DEBUG: After nonlinearity
+    print(f"[DECODER] nonlinearity: shape={x.shape}, min={x.min():.4f}, max={x.max():.4f}, mean={x.mean():.4f}")
+
     if feat_cache is not None:
       idx = feat_idx[0]
       cache_x = jnp.copy(x[:, -CACHE_T:, :, :, :])
@@ -923,6 +943,10 @@ class WanDecoder3d(nnx.Module):
       feat_idx[0] += 1
     else:
       x = self.conv_out(x)
+
+    # DEBUG: Final decoder output (before returning to _decode)
+    print(f"[DECODER] conv_out (final): shape={x.shape}, min={x.min():.4f}, max={x.max():.4f}, mean={x.mean():.4f}")
+
     return x
 
 
@@ -1103,13 +1127,26 @@ class AutoencoderKLWan(nnx.Module, FlaxModelMixin, ConfigMixin):
   ) -> Union[FlaxDecoderOutput, jax.Array]:
     feat_cache.clear_cache()
     iter_ = z.shape[1]
+
+    # DEBUG: Input latents
+    print(f"[VAE DECODE] Input z: shape={z.shape}, min={z.min():.4f}, max={z.max():.4f}, mean={z.mean():.4f}")
+
     x = self.post_quant_conv(z)
+
+    # DEBUG: After post_quant_conv
+    print(f"[VAE DECODE] post_quant_conv: shape={x.shape}, min={x.min():.4f}, max={x.max():.4f}, mean={x.mean():.4f}")
+
     for i in range(iter_):
       feat_cache._conv_idx = [0]
       if i == 0:
         out = self.decoder(x[:, i : i + 1, :, :, :], feat_cache=feat_cache._feat_map, feat_idx=feat_cache._conv_idx)
+        # DEBUG: First frame output
+        print(f"[VAE DECODE] Frame {i} (first): shape={out.shape}, min={out.min():.4f}, max={out.max():.4f}, mean={out.mean():.4f}")
       else:
         out_ = self.decoder(x[:, i : i + 1, :, :, :], feat_cache=feat_cache._feat_map, feat_idx=feat_cache._conv_idx)
+
+        # DEBUG: Decoder output before frame reordering
+        print(f"[VAE DECODE] Frame {i} decoder out_: shape={out_.shape}, min={out_.min():.4f}, max={out_.max():.4f}, mean={out_.mean():.4f}")
 
         # This is to bypass an issue where frame[1] should be frame[2] and vise versa.
         # Ideally shouldn't need to do this however, can't find where the frame is going out of sync.
@@ -1126,8 +1163,26 @@ class AutoencoderKLWan(nnx.Module, FlaxModelMixin, ConfigMixin):
           fm2 = jnp.expand_dims(fm2, axis=axis)
           fm3 = jnp.expand_dims(fm3, axis=axis)
           fm4 = jnp.expand_dims(fm4, axis=axis)
+
+        # DEBUG: Individual frames after reordering
+        print(f"[VAE DECODE] Frame {i} fm1: min={fm1.min():.4f}, max={fm1.max():.4f}, mean={fm1.mean():.4f}")
+        print(f"[VAE DECODE] Frame {i} fm2: min={fm2.min():.4f}, max={fm2.max():.4f}, mean={fm2.mean():.4f}")
+        print(f"[VAE DECODE] Frame {i} fm3: min={fm3.min():.4f}, max={fm3.max():.4f}, mean={fm3.mean():.4f}")
+        print(f"[VAE DECODE] Frame {i} fm4: min={fm4.min():.4f}, max={fm4.max():.4f}, mean={fm4.mean():.4f}")
+
         out = jnp.concatenate([out, fm1, fm3, fm2, fm4], axis=1)
+
+        # DEBUG: After concatenation
+        print(f"[VAE DECODE] After concat frame {i}: shape={out.shape}, min={out.min():.4f}, max={out.max():.4f}, mean={out.mean():.4f}")
+
+    # DEBUG: Before clipping
+    print(f"[VAE DECODE] Before clip: shape={out.shape}, min={out.min():.4f}, max={out.max():.4f}, mean={out.mean():.4f}")
+
     out = jnp.clip(out, min=-1.0, max=1.0)
+
+    # DEBUG: After clipping (final output)
+    print(f"[VAE DECODE] Final output: shape={out.shape}, min={out.min():.4f}, max={out.max():.4f}, mean={out.mean():.4f}")
+
     feat_cache.clear_cache()
     if not return_dict:
       return (out,)
