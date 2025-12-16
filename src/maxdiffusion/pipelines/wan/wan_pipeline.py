@@ -242,9 +242,12 @@ class WanPipeline:
     if use_custom_text_encoder:
       from ...models.wan import umt5_load, umt5
       max_logging.log(f"Loading custom WAN text encoder from {config.pretrained_model_name_or_path}")
-      text_encoder = umt5_load.create_t5_encoder_from_safe_tensors(
-          config.pretrained_model_name_or_path,
-      )
+      # Load on CPU to save TPU memory for transformer
+      with jax.default_device(jax.devices('cpu')[0]):
+        text_encoder = umt5_load.create_t5_encoder_from_safe_tensors(
+            config.pretrained_model_name_or_path,
+            mesh=None,  # No mesh = CPU
+        )
 
       return text_encoder
 
@@ -523,8 +526,13 @@ class WanPipeline:
         mask_jax = jnp.array(mask.numpy())
         seq_lens_jax = jnp.sum(mask_jax, axis=1).astype(jnp.int32)
 
-        # Call custom encoder with JAX arrays
-        prompt_embeds_jax = self.text_encoder(text_input_ids_jax, mask_jax, deterministic=True).last_hidden_state
+        # Run encoder on CPU to save TPU memory for transformer
+        with jax.default_device(jax.devices('cpu')[0]):
+            text_input_ids_cpu = jax.device_put(text_input_ids_jax, jax.devices('cpu')[0])
+            mask_cpu = jax.device_put(mask_jax, jax.devices('cpu')[0])
+            # Call custom encoder with JAX arrays on CPU
+            prompt_embeds_jax = self.text_encoder(text_input_ids_cpu, mask_cpu, deterministic=True).last_hidden_state
+            prompt_embeds_jax = jnp.array(prompt_embeds_jax)  # Keep on CPU
 
         # Process embeddings in JAX
         prompt_embeds_list = [u[:v] for u, v in zip(prompt_embeds_jax, seq_lens_jax)]
