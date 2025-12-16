@@ -655,6 +655,67 @@ def load_vae_from_checkpoint(checkpoint_path: str, rngs: nnx.Rngs) -> WanVAEDeco
     return vae_decoder
 
 
+class WanVAEAdapter(nnx.Module):
+    """Adapter to make WanVAEDecoder compatible with the pipeline interface."""
+
+    def __init__(self, vae_decoder: WanVAEDecoder = None, cfg: VAEConfig = None, *, rngs: nnx.Rngs = None):
+        """
+        Initialize adapter either from existing decoder or by creating new one.
+
+        Args:
+            vae_decoder: Pre-loaded WanVAEDecoder (when loading from checkpoint)
+            cfg: VAE config (when creating from scratch)
+            rngs: Random number generators (when creating from scratch)
+        """
+        if vae_decoder is not None:
+            self.decoder = vae_decoder
+            _cfg = VAEConfig()  # Use default config for attributes
+        elif cfg is not None and rngs is not None:
+            self.decoder = WanVAEDecoder(cfg, rngs=rngs)
+            _cfg = cfg
+        else:
+            raise ValueError("Must provide either vae_decoder or (cfg, rngs)")
+
+        # Add attributes expected by pipeline
+        self.latents_mean = _cfg.latent_mean  # Tuple of 16 floats
+        self.latents_std = _cfg.latent_std    # Tuple of 16 floats
+        self.z_dim = 16  # Latent dimension
+        self.temperal_downsample = [True, True]  # 2x temporal downsampling: 81 -> 21
+
+    def decode(self, latents: Array, cache=None) -> tuple:
+        """
+        Pipeline-compatible decode interface.
+
+        Args:
+            latents: [B, C, T, H, W] channel-first OR [B, T, H, W, C] channel-last latents
+            cache: Unused (for compatibility with original VAE interface)
+
+        Returns:
+            Tuple of (decoded_video, None) where:
+                decoded_video: [B, T_out, H_out, W_out, 3] RGB video in [-1, 1]
+        """
+        # Check if latents are channel-first or channel-last
+        if latents.shape[-1] != self.z_dim:
+            # Channel-first [B, C, T, H, W] -> transpose to channel-last [B, T, H, W, C]
+            latents = jnp.transpose(latents, (0, 2, 3, 4, 1))
+
+        assert latents.shape[-1] == self.z_dim, f"Expected latent dim {self.z_dim}, got {latents.shape[-1]}"
+
+        # Custom VAE does denormalization internally, but pipeline expects to do it
+        # So we need to RE-normalize before passing to decoder (which will denormalize again)
+        latent_mean = jnp.array(self.latents_mean).reshape(1, 1, 1, 1, 16)
+        latent_std = jnp.array(self.latents_std).reshape(1, 1, 1, 1, 16)
+
+        # Reverse the pipeline's denormalization: z_normalized = (z_denormalized - mean) / std
+        latents_normalized = (latents - latent_mean) / latent_std
+
+        # Decode (decoder will denormalize internally)
+        video = self.decoder.decode(latents_normalized)
+
+        # Return in format expected by pipeline: (video, None)
+        return (video, None)
+
+
 def decode_latents_to_video(vae_decoder: WanVAEDecoder, latents: Array, normalize: bool = True) -> Array:
     """
     Helper function to decode latents and post-process to video.
@@ -709,4 +770,4 @@ def save_video(
         return None
 
 
-__all__ = ["VAEConfig", "WanVAEDecoder", "decode_latents_to_video", "load_vae_from_checkpoint", "save_video"]
+__all__ = ["VAEConfig", "WanVAEDecoder", "WanVAEAdapter", "decode_latents_to_video", "load_vae_from_checkpoint", "save_video"]

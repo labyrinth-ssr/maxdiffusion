@@ -253,6 +253,20 @@ class WanPipeline:
 
   @classmethod
   def load_vae(cls, devices_array: np.array, mesh: Mesh, rngs: nnx.Rngs, config: HyperParameters):
+    # Check if we should use custom VAE loader
+    use_custom_vae = getattr(config, 'use_custom_vae', False)
+
+    if use_custom_vae:
+      from ...models.wan import vae_wan_load, vae_wan
+      max_logging.log(f"Loading custom WAN VAE from {config.pretrained_model_name_or_path}")
+      vae_decoder = vae_wan_load.create_vae_decoder_from_safe_tensors(
+          config.pretrained_model_name_or_path,
+          mesh=mesh
+      )
+      # Wrap in adapter
+      wan_vae = vae_wan.WanVAEAdapter(vae_decoder=vae_decoder)
+      vae_cache = None  # Custom VAE doesn't use cache
+      return wan_vae, vae_cache
 
     def create_model(rngs: nnx.Rngs, config: HyperParameters):
       wan_vae = AutoencoderKLWan.from_config(

@@ -15,6 +15,7 @@
 """Weight loading utilities for Wan2.1-T2V-1.3B model."""
 
 import gc
+import os
 import re
 from enum import Enum
 
@@ -23,6 +24,7 @@ import jax.numpy as jnp
 import safetensors
 from etils import epath
 from flax import nnx
+from huggingface_hub import snapshot_download
 
 from . import vae_wan as vae_lib
 
@@ -248,14 +250,30 @@ def create_vae_decoder_from_safe_tensors(
     Load Wan-VAE decoder from safetensors checkpoint.
 
     Args:
-        file_dir: Directory containing .safetensors files or path to VAE directory
+        file_dir: HuggingFace model ID (e.g., "Wan-AI/Wan2.1-T2V-1.3B-Diffusers")
+                  OR local directory containing .safetensors files
         mesh: Optional JAX mesh for sharding
 
     Returns:
         WanVAEDecoder with loaded weights
     """
+    # Check if input is local directory or HuggingFace model ID
+    if os.path.isdir(file_dir):
+        # Local directory: use directly
+        print(f"Loading VAE from local directory: {file_dir}")
+        local_dir = file_dir
+    else:
+        # HuggingFace model ID: download entire repo
+        print(f"Downloading VAE from HuggingFace: {file_dir}")
+        local_dir = snapshot_download(
+            repo_id=file_dir,
+            allow_patterns=["vae/*.safetensors"],  # Only download VAE weights
+            cache_dir=None,  # Use default cache: ~/.cache/huggingface/hub/
+        )
+        print(f"Downloaded to: {local_dir}")
+
     # Check if file_dir is the model root or VAE subdirectory
-    file_path = epath.Path(file_dir).expanduser()
+    file_path = epath.Path(local_dir).expanduser()
     vae_path = file_path / "vae"
 
     if vae_path.exists():
@@ -266,7 +284,7 @@ def create_vae_decoder_from_safe_tensors(
         files = list(file_path.glob("*.safetensors"))
 
     if not files:
-        raise ValueError(f"No safetensors found in {file_dir} or {file_dir}/vae")
+        raise ValueError(f"No safetensors found in {local_dir} or {local_dir}/vae")
 
     print(f"Found {len(files)} VAE safetensors file(s)")
 
