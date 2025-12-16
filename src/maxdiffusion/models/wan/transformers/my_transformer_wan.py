@@ -394,7 +394,7 @@ class Wan2DiT(nnx.Module):
         self.final_layer = FinalLayer(cfg, rngs=rngs)
 
     @jax.named_scope("wan2_dit")
-    # @jax.jit
+    @jax.jit
     def forward(
         self,
         latents: Array,
