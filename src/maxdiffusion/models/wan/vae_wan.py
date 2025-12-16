@@ -447,8 +447,8 @@ class Decoder3D(nnx.Module):
             cache_list: Updated cache tuple
         """
         # DEBUG: Decoder3D input
-        jax.debug.print("[DECODER3D] Input: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       z.shape, jnp.min(z), jnp.max(z), jnp.mean(z), ordered=True)
+        # jax.debug.print("[DECODER3D] Input: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    z.shape, jnp.min(z), jnp.max(z), jnp.mean(z), ordered=True)
 
         # Initial convolution
         if cache_list is not None:
@@ -460,27 +460,27 @@ class Decoder3D(nnx.Module):
             x, _ = self.conv_in(z, None)
 
         # DEBUG: After conv_in
-        jax.debug.print("[DECODER3D] conv_in: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
+        # jax.debug.print("[DECODER3D] conv_in: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
 
         # Middle blocks
         x, cache_list = self.mid_block1(x, cache_list, cache_idx)
 
         # DEBUG: After mid_block1
-        jax.debug.print("[DECODER3D] mid_block1: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
+        # jax.debug.print("[DECODER3D] mid_block1: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
 
         x = self.mid_attn(x)  # Attention doesn't use cache
 
         # DEBUG: After mid_attn
-        jax.debug.print("[DECODER3D] mid_attn: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
+        # jax.debug.print("[DECODER3D] mid_attn: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
 
         x, cache_list = self.mid_block2(x, cache_list, cache_idx)
 
         # DEBUG: After mid_block2
-        jax.debug.print("[DECODER3D] mid_block2: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
+        # jax.debug.print("[DECODER3D] mid_block2: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
 
         # Upsample stage 0
         for block in self.up_blocks_0:
@@ -488,8 +488,8 @@ class Decoder3D(nnx.Module):
         x, cache_list = self.up_sample_0(x, cache_list, cache_idx)
 
         # DEBUG: After upsample stage 0
-        jax.debug.print("[DECODER3D] up_sample_0: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
+        # jax.debug.print("[DECODER3D] up_sample_0: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
 
         # Upsample stage 1
         for block in self.up_blocks_1:
@@ -497,8 +497,8 @@ class Decoder3D(nnx.Module):
         x, cache_list = self.up_sample_1(x, cache_list, cache_idx)
 
         # DEBUG: After upsample stage 1
-        jax.debug.print("[DECODER3D] up_sample_1: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
+        # jax.debug.print("[DECODER3D] up_sample_1: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
 
         # Upsample stage 2
         for block in self.up_blocks_2:
@@ -506,29 +506,29 @@ class Decoder3D(nnx.Module):
         x = self.up_sample_2(x)  # Spatial-only upsample, no cache
 
         # DEBUG: After upsample stage 2
-        jax.debug.print("[DECODER3D] up_sample_2: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
+        # jax.debug.print("[DECODER3D] up_sample_2: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
 
         # Upsample stage 3 (no spatial upsample)
         for block in self.up_blocks_3:
             x, cache_list = block(x, cache_list, cache_idx)
 
         # DEBUG: After upsample stage 3
-        jax.debug.print("[DECODER3D] up_sample_3: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
+        # jax.debug.print("[DECODER3D] up_sample_3: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
 
         # Output
         x = self.norm_out(x)
 
         # DEBUG: After norm_out
-        jax.debug.print("[DECODER3D] norm_out: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
+        # jax.debug.print("[DECODER3D] norm_out: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
 
         x = nnx.silu(x)
 
         # DEBUG: After silu activation
-        jax.debug.print("[DECODER3D] silu: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
+        # jax.debug.print("[DECODER3D] silu: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
 
         if cache_list is not None:
             idx = cache_idx[0]
@@ -539,8 +539,8 @@ class Decoder3D(nnx.Module):
             x, _ = self.conv_out(x, None)
 
         # DEBUG: Final decoder output
-        jax.debug.print("[DECODER3D] conv_out (final): shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
+        # jax.debug.print("[DECODER3D] conv_out (final): shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
 
         return x, cache_list
 
@@ -586,8 +586,8 @@ class WanVAEDecoder(nnx.Module):
         """
         # # Step 1: Denormalize
         # # DEBUG: Input latents
-        # jax.debug.print("[VAE_WAN DECODE] Input latents: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-        #                latents.shape, jnp.min(latents), jnp.max(latents), jnp.mean(latents), ordered=True)
+        jax.debug.print("[VAE_WAN DECODE] Input latents: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                       latents.shape, jnp.min(latents), jnp.max(latents), jnp.mean(latents), ordered=True)
 
         # # Convert Python tuples to JAX arrays at runtime (JIT treats them as static constants)
         # latent_mean = jnp.array(self.latent_mean_tuple).reshape(1, 1, 1, 1, 16)
@@ -596,21 +596,21 @@ class WanVAEDecoder(nnx.Module):
         z = latents
 
         # DEBUG: After denormalization
-        jax.debug.print("[VAE_WAN DECODE] After denormalization: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       z.shape, jnp.min(z), jnp.max(z), jnp.mean(z), ordered=True)
+        # jax.debug.print("[VAE_WAN DECODE] After denormalization: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    z.shape, jnp.min(z), jnp.max(z), jnp.mean(z), ordered=True)
 
         z, _ = self.conv2(z, None)
 
         # DEBUG: After conv2
-        jax.debug.print("[VAE_WAN DECODE] After conv2: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       z.shape, jnp.min(z), jnp.max(z), jnp.mean(z), ordered=True)
+        # jax.debug.print("[VAE_WAN DECODE] After conv2: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    z.shape, jnp.min(z), jnp.max(z), jnp.mean(z), ordered=True)
 
         # Scan over time dimension: z is [B, T, H, W, C], transpose to [T, B, H, W, C]
         z_frames = jnp.moveaxis(z, 1, 0)  # [T, B, H, W, C]
         # Add singleton time dimension for each frame: [T, B, 1, H, W, C]
         z_frames = z_frames[:, :, None, :, :, :]
 
-        # jax.debug.print("z_frames has nan:{}", jnp.isnan(z_frames).any())
+        jax.debug.print("z_frames has nan:{}", jnp.isnan(z_frames).any())
 
         # Warm-up pass: process first frame to initialize cache with correct shapes
         # This ensures consistent pytree structure for jax.lax.scan
@@ -628,10 +628,10 @@ class WanVAEDecoder(nnx.Module):
             frame_out, new_cache_tuple = self.decoder(frame_latent, cache_tuple, cache_idx)
             # num_arrays = sum(isinstance(x, jnp.ndarray) for x in new_cache_tuple)
             # num_nones = sum(x is None for x in new_cache_tuple)
-            # jax.debug.print("new cache Arrays: {},cache Nones: {}", num_arrays, num_nones)
-            # jax.debug.print("frame_out shape:{}", frame_out.shape)
+            jax.debug.print("new cache Arrays: {},cache Nones: {}", num_arrays, num_nones)
+            jax.debug.print("frame_out shape:{}", frame_out.shape)
             # right_part_frame = frame_out[:, :, :, 235:, :]
-            # jax.debug.print("frame_out Has NaN: {}", jnp.isnan(right_part_frame).any())
+            jax.debug.print("frame_out Has NaN: {}", jnp.isnan(right_part_frame).any())
             return new_cache_tuple, frame_out
 
         # Process remaining frames with JIT
@@ -672,15 +672,15 @@ class WanVAEDecoder(nnx.Module):
             x = first_frame_out
 
         # DEBUG: Before clipping
-        jax.debug.print("[VAE_WAN DECODE] Before clip: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
+        # jax.debug.print("[VAE_WAN DECODE] Before clip: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
 
         # Clamp to [-1, 1]
         x = jnp.clip(x, -1.0, 1.0)
 
         # DEBUG: Final output
-        jax.debug.print("[VAE_WAN DECODE] Final output: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                       x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
+        # jax.debug.print("[VAE_WAN DECODE] Final output: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
+                    #    x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
 
         return x
 
