@@ -573,10 +573,9 @@ class WanVAEDecoder(nnx.Module):
         num_nones = sum(x is None for x in cache_tuple)
         print(f"cache Arrays: {num_arrays},cache Nones: {num_nones}")
 
-        # JIT-compiled scan function for remaining frames (now cache has concrete shapes)
-        @jax.jit
+        # Scan function for remaining frames (JIT-compiled automatically by scan)
         def scan_frames(cache_tuple, frame_latent):
-            """Process single frame with caching (JIT-compiled)."""
+            """Process single frame with caching."""
             cache_idx = [0]
             frame_out, new_cache_tuple = self.decoder(frame_latent, cache_tuple, cache_idx)
             # num_arrays = sum(isinstance(x, jnp.ndarray) for x in new_cache_tuple)
@@ -589,8 +588,7 @@ class WanVAEDecoder(nnx.Module):
 
         # Process remaining frames with JIT
         if z_frames.shape[0] > 1:
-            with jax.disable_jit():
-                _final_cache, remaining_outputs = jax.lax.scan(scan_frames, cache_tuple, z_frames[1:])
+            _final_cache, remaining_outputs = jax.lax.scan(scan_frames, cache_tuple, z_frames[1:])
 
             print(f"remaining output shape: {remaining_outputs.shape}")
             right_part_remaining = remaining_outputs[:, :, :, :, 235:, :]
