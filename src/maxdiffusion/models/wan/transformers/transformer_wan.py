@@ -386,7 +386,7 @@ class WanTransformerBlock(nnx.Module):
         norm_hidden_states = (self.norm1(hidden_states.astype(jnp.float32)) * (1 + scale_msa) + shift_msa).astype(
             hidden_states.dtype
         )
-        _log_stats("self_attn_norm", norm_hidden_states, step_state, True)
+        # _log_stats("self_attn_norm", norm_hidden_states, step_state, True)
       with self.conditional_named_scope("self_attn_attn"):
         attn_output = self.attn1(
             hidden_states=norm_hidden_states,
@@ -395,20 +395,20 @@ class WanTransformerBlock(nnx.Module):
             deterministic=deterministic,
             rngs=rngs,
         )
-        _log_stats("self_attn_attn", attn_output, step_state, True)
+        # _log_stats("self_attn_attn", attn_output, step_state, True)
       with self.conditional_named_scope("self_attn_residual"):
         hidden_states = (hidden_states.astype(jnp.float32) + attn_output * gate_msa).astype(hidden_states.dtype)
-        _log_stats("post_self_attn", hidden_states, step_state, True)
+        # _log_stats("post_self_attn", hidden_states, step_state, True)
 
     # 2. Cross-attention
     norm_hidden_states = self.norm2(hidden_states.astype(jnp.float32)).astype(hidden_states.dtype)
-    _log_stats("cross_attn_norm", norm_hidden_states, step_state, True)
+    # _log_stats("cross_attn_norm", norm_hidden_states, step_state, True)
     attn_output = self.attn2(
         hidden_states=norm_hidden_states, encoder_hidden_states=encoder_hidden_states, deterministic=deterministic, rngs=rngs
     )
-    _log_stats("cross_attn_attn", attn_output, step_state, True)
+    # _log_stats("cross_attn_attn", attn_output, step_state, True)
     hidden_states = hidden_states + attn_output
-    _log_stats("post_cross_attn", hidden_states, step_state, True)
+    # _log_stats("post_cross_attn", hidden_states, step_state, True)
 
     # 3. Feed-forward
     with self.conditional_named_scope("mlp"):
@@ -416,16 +416,16 @@ class WanTransformerBlock(nnx.Module):
         norm_hidden_states = (self.norm3(hidden_states.astype(jnp.float32)) * (1 + c_scale_msa) + c_shift_msa).astype(
             hidden_states.dtype
         )
-        _log_stats("mlp_norm", norm_hidden_states, step_state, True)
+        # _log_stats("mlp_norm", norm_hidden_states, step_state, True)
 
     with self.conditional_named_scope("mlp_ffn"):
       ff_output = self.ffn(norm_hidden_states, deterministic=deterministic, rngs=rngs)
-      _log_stats("mlp_ffn", ff_output, step_state, True)
+      # _log_stats("mlp_ffn", ff_output, step_state, True)
     with self.conditional_named_scope("mlp_residual"):
       hidden_states = (hidden_states.astype(jnp.float32) + ff_output.astype(jnp.float32) * c_gate_msa).astype(
             hidden_states.dtype
         )
-      _log_stats("post_mlp", hidden_states, step_state, True)
+      # _log_stats("post_mlp", hidden_states, step_state, True)
     return hidden_states
 
 
@@ -591,21 +591,21 @@ class WanModel(nnx.Module, FlaxModelMixin, ConfigMixin):
     post_patch_height = height // p_h
     post_patch_width = width // p_w
 
-    _log_stats("input", hidden_states, step_state, debug)
+    # _log_stats("input", hidden_states, step_state, debug)
     hidden_states = jnp.transpose(hidden_states, (0, 2, 3, 4, 1))
     rotary_emb = self.rope(hidden_states)
 
     hidden_states = self.patch_embedding(hidden_states)
     hidden_states = jax.lax.collapse(hidden_states, 1, -1)
-    _log_stats("patch_embedding", hidden_states, step_state, debug)
+    # _log_stats("patch_embedding", hidden_states, step_state, debug)
 
     temb, timestep_proj, encoder_hidden_states, encoder_hidden_states_image = self.condition_embedder(
         timestep, encoder_hidden_states, encoder_hidden_states_image
     )
     timestep_proj = timestep_proj.reshape(timestep_proj.shape[0], 6, -1)
-    _log_stats("time_embed", temb, step_state, debug)
-    _log_stats("time_proj", timestep_proj, step_state, debug)
-    _log_stats("text_embed", encoder_hidden_states, step_state, debug)
+    # _log_stats("time_embed", temb, step_state, debug)
+    # _log_stats("time_proj", timestep_proj, step_state, debug)
+    # _log_stats("text_embed", encoder_hidden_states, step_state, debug)
 
     if encoder_hidden_states_image is not None:
       raise NotImplementedError("img2vid is not yet implemented.")
@@ -632,7 +632,7 @@ class WanModel(nnx.Module, FlaxModelMixin, ConfigMixin):
       )(initial_carry, self.blocks)
 
       hidden_states, _ = final_carry
-      _log_stats("blocks_out", hidden_states, step_state, debug)
+      # _log_stats("blocks_out", hidden_states, step_state, debug)
     else:
       for block_idx, block in enumerate(self.blocks):
 
@@ -643,14 +643,14 @@ class WanModel(nnx.Module, FlaxModelMixin, ConfigMixin):
             layer_forward, self.names_which_can_be_saved, self.names_which_can_be_offloaded, prevent_cse=not self.scan_layers
         )
         hidden_states = rematted_layer_forward(hidden_states)
-        _log_stats(f"block_{block_idx}_out", hidden_states, step_state, debug)
+        # _log_stats(f"block_{block_idx}_out", hidden_states, step_state, debug)
 
     shift, scale = jnp.split(self.scale_shift_table + jnp.expand_dims(temb, axis=1), 2, axis=1)
     with self.conditional_named_scope("output_norm"):
       hidden_states = (self.norm_out(hidden_states.astype(jnp.float32)) * (1 + scale) + shift).astype(hidden_states.dtype)
     with self.conditional_named_scope("output_proj"):
       hidden_states = self.proj_out(hidden_states)
-    _log_stats("post_proj", hidden_states, step_state, debug)
+    # _log_stats("post_proj", hidden_states, step_state, debug)
 
     hidden_states = hidden_states.reshape(
         batch_size, post_patch_num_frames, post_patch_height, post_patch_width, p_t, p_h, p_w, -1
@@ -659,5 +659,5 @@ class WanModel(nnx.Module, FlaxModelMixin, ConfigMixin):
     hidden_states = jax.lax.collapse(hidden_states, 6, None)
     hidden_states = jax.lax.collapse(hidden_states, 4, 6)
     hidden_states = jax.lax.collapse(hidden_states, 2, 4)
-    _log_stats("unpatchify", hidden_states, step_state, debug)
+    # _log_stats("unpatchify", hidden_states, step_state, debug)
     return hidden_states
