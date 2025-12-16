@@ -237,6 +237,18 @@ class WanPipeline:
 
   @classmethod
   def load_text_encoder(cls, config: HyperParameters):
+    use_custom_text_encoder = getattr(config, 'use_custom_text_encoder', False)
+
+    if use_custom_text_encoder:
+      from ...models.wan import umt5_load, umt5
+      max_logging.log(f"Loading custom WAN text encoder from {config.pretrained_model_name_or_path}")
+      text_encoder = umt5_load.create_t5_encoder_from_safe_tensors(
+          config.pretrained_model_name_or_path,
+      )
+
+      return text_encoder
+
+
     text_encoder = UMT5EncoderModel.from_pretrained(
         config.pretrained_model_name_or_path,
         subfolder="text_encoder",

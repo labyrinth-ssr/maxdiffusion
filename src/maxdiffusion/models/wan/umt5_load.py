@@ -24,9 +24,9 @@ import safetensors
 from etils import epath
 from flax import nnx
 
-from bonsai.models.wan2 import transformer_wan as model_lib
-from bonsai.models.wan2 import umt5 as t5_lib
-from bonsai.models.wan2 import vae_wan as vae_lib
+# from bonsai.models.wan2 import transformer_wan as model_lib
+from . import umt5 as t5_lib
+# from bonsai.models.wan2 import vae_wan as vae_lib
 
 
 def cast_with_exclusion(path, x, dtype_to_cast):
@@ -292,13 +292,11 @@ def create_t5_encoder_from_safe_tensors(
     Returns:
         T5EncoderModel with loaded weights
     """
-    from bonsai.models.wan2 import umt5
-
     # Use provided config or default to UMT5-XXL
     if config is None:
-        config = umt5.T5Config.umt5_xxl()
+        config = t5_lib.T5Config.umt5_xxl()
 
-    t5_encoder = nnx.eval_shape(lambda: umt5.T5EncoderModel(config, rngs=nnx.Rngs(params=0, dropout=0)))
+    t5_encoder = nnx.eval_shape(lambda: t5_lib.T5EncoderModel(config, rngs=nnx.Rngs(params=0, dropout=0)))
     graph_def, abs_state = nnx.split(t5_encoder)
     state_dict = abs_state.to_pure_dict()
 

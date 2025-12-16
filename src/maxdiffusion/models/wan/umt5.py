@@ -1,12 +1,23 @@
 import dataclasses
 import math
-from typing import Optional
+from typing import Optional, NamedTuple
 
 import jax
 import jax.numpy as jnp
 from flax import nnx
 from jax.lax import Precision
 from jaxtyping import Array
+
+
+class T5EncoderOutput(NamedTuple):
+    """Output format compatible with Hugging Face transformers."""
+    last_hidden_state: Array
+
+    def __getitem__(self, idx):
+        """Allow tuple-style indexing: output[0] returns last_hidden_state."""
+        if idx == 0:
+            return self.last_hidden_state
+        raise IndexError(f"Index {idx} out of range for T5EncoderOutput")
 
 
 def gelu(x: Array) -> Array:
@@ -363,7 +374,7 @@ class T5EncoderModel(nnx.Module):
         """
         return cls(T5Config.umt5_base(), rngs=rngs)
 
-    def __call__(self, input_ids: Array, attention_mask: Optional[Array] = None, deterministic: bool = True) -> Array:
+    def __call__(self, input_ids: Array, attention_mask: Optional[Array] = None, deterministic: bool = True) -> T5EncoderOutput:
         """Encode text.
 
         Args:
@@ -372,9 +383,11 @@ class T5EncoderModel(nnx.Module):
             deterministic: whether to disable dropout (True for inference)
 
         Returns:
-            [B, L, dim] encoded text embeddings (dim depends on config)
+            T5EncoderOutput with last_hidden_state field containing [B, L, dim] encoded text embeddings
+            Can be accessed as output[0] or output.last_hidden_state
         """
-        return self.encoder(input_ids, mask=attention_mask, deterministic=deterministic)
+        hidden_states = self.encoder(input_ids, mask=attention_mask, deterministic=deterministic)
+        return T5EncoderOutput(last_hidden_state=hidden_states)
 
 
-__all__ = ["T5Config", "T5Encoder", "T5EncoderModel"]
+__all__ = ["T5Config", "T5Encoder", "T5EncoderModel", "T5EncoderOutput"]
