@@ -290,6 +290,7 @@ class WanAttentionBlock(nnx.Module):
         Returns:
             [B, N, D] transformed tokens
         """
+        step_state = {"i": 0}
         # Get modulation from time embedding
         b = time_proj.shape[0]
         d = self.cfg.hidden_dim
@@ -301,28 +302,28 @@ class WanAttentionBlock(nnx.Module):
         # Self-attention with AdaLN modulation and RoPE
         norm_x = self.norm1(x)
         norm_x = modulate(norm_x, shift_msa[:, None, :], scale_msa[:, None, :])
-        _log_stats("wan_block_norm1", norm_x, {}, True)
+        _log_stats("wan_block_norm1", norm_x, step_state, True)
         attn_out = self.self_attn(norm_x, rope_state=rope_state, deterministic=deterministic)
-        _log_stats("wan_block_attn_out", attn_out, {}, True)
+        _log_stats("wan_block_attn_out", attn_out, step_state, True)
         x = (x.astype(jnp.float32) + gate_msa[:, None, :] * attn_out).astype(x.dtype)
-        _log_stats("wan_block_post_attn", x, {}, True)
+        _log_stats("wan_block_post_attn", x, step_state, True)
 
         # Cross-attention
         norm_x = self.norm2(x)
-        _log_stats("wan_block_norm2", norm_x, {}, True)
+        _log_stats("wan_block_norm2", norm_x, step_state, True)
         cross_out = self.cross_attn(norm_x, text_embeds, deterministic=deterministic)
-        _log_stats("wan_block_cross_out", cross_out, {}, True)
+        _log_stats("wan_block_cross_out", cross_out, step_state, True)
         x = x + cross_out
-        _log_stats("wan_block_post_cross_attn", x, {}, True)
+        _log_stats("wan_block_post_cross_attn", x, step_state, True)
 
         # MLP with AdaLN modulation
         norm_x = self.norm3(x)
         norm_x = modulate(norm_x, shift_mlp[:, None, :], scale_mlp[:, None, :])
-        _log_stats("wan_block_norm3", norm_x, {}, True)
+        _log_stats("wan_block_norm3", norm_x, step_state, True)
         mlp_out = self.mlp(norm_x)
-        _log_stats("wan_block_mlp_out", mlp_out, {}, True)
+        _log_stats("wan_block_mlp_out", mlp_out, step_state, True)
         x = (x.astype(jnp.float32) + gate_mlp[:, None, :] * mlp_out).astype(jnp.float32)
-        _log_stats("wan_block_post_mlp", x, {}, True)
+        _log_stats("wan_block_post_mlp", x, step_state, True)
         return x
 
 
