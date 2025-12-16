@@ -196,7 +196,7 @@ def create_t5_encoder_from_safe_tensors(
         print(f"Downloading VAE from HuggingFace: {file_dir}")
         local_dir = snapshot_download(
             repo_id=file_dir,
-            allow_patterns=["vae/*.safetensors"],  # Only download VAE weights
+            allow_patterns=["text_encoder/*.safetensors"],  # Only download VAE weights
             cache_dir=None,  # Use default cache: ~/.cache/huggingface/hub/
         )
         print(f"Downloaded to: {local_dir}")
