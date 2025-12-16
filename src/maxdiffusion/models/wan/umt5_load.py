@@ -203,7 +203,7 @@ def create_t5_encoder_from_safe_tensors(
 
 
     # Check if file_dir is the model root or text_encoder subdirectory
-    file_path = epath.Path(file_dir).expanduser()
+    file_path = epath.Path(local_dir).expanduser()
     text_encoder_path = file_path / "text_encoder"
 
     def load_pytorch_weights(file_dir):
