@@ -512,12 +512,38 @@ class WanPipeline:
         return_tensors="pt",
     )
     text_input_ids, mask = text_inputs.input_ids, text_inputs.attention_mask
-    seq_lens = mask.gt(0).sum(dim=1).long()
-    prompt_embeds = self.text_encoder(text_input_ids, mask).last_hidden_state
-    prompt_embeds = [u[:v] for u, v in zip(prompt_embeds, seq_lens)]
-    prompt_embeds = torch.stack(
-        [torch.cat([u, u.new_zeros(max_sequence_length - u.size(0), u.size(1))]) for u in prompt_embeds], dim=0
-    )
+
+    # Check if using custom JAX encoder (needs JAX arrays) or HuggingFace encoder (uses PyTorch tensors)
+    use_custom_text_encoder = getattr(self.config, 'use_custom_text_encoder', False)
+
+    if use_custom_text_encoder:
+        # Convert PyTorch tensors to JAX arrays for custom encoder
+        import jax.numpy as jnp
+        text_input_ids_jax = jnp.array(text_input_ids.numpy())
+        mask_jax = jnp.array(mask.numpy())
+        seq_lens_jax = jnp.sum(mask_jax, axis=1).astype(jnp.int32)
+
+        # Call custom encoder with JAX arrays
+        prompt_embeds_jax = self.text_encoder(text_input_ids_jax, mask_jax, deterministic=True).last_hidden_state
+
+        # Process embeddings in JAX
+        prompt_embeds_list = [u[:v] for u, v in zip(prompt_embeds_jax, seq_lens_jax)]
+        prompt_embeds_jax = jnp.stack(
+            [jnp.concatenate([u, jnp.zeros((max_sequence_length - u.shape[0], u.shape[1]), dtype=u.dtype)], axis=0)
+             for u in prompt_embeds_list],
+            axis=0
+        )
+
+        # Convert back to PyTorch for compatibility with rest of pipeline
+        prompt_embeds = torch.from_numpy(np.array(prompt_embeds_jax))
+    else:
+        # Use HuggingFace encoder with PyTorch tensors
+        seq_lens = mask.gt(0).sum(dim=1).long()
+        prompt_embeds = self.text_encoder(text_input_ids, mask).last_hidden_state
+        prompt_embeds = [u[:v] for u, v in zip(prompt_embeds, seq_lens)]
+        prompt_embeds = torch.stack(
+            [torch.cat([u, u.new_zeros(max_sequence_length - u.size(0), u.size(1))]) for u in prompt_embeds], dim=0
+        )
 
     # duplicate text embeddings for each generation per prompt, using mps friendly method
     _, seq_len, _ = prompt_embeds.shape
