@@ -44,7 +44,7 @@ activations_dtype: "bfloat16"
 # Replicates vae across devices instead of using the model's sharding annotations for sharding.
 replicate_vae: False
 # Use custom VAE implementation (vae_wan.py) instead of original AutoencoderKLWan
-use_custom_vae: False
+use_custom_vae: True
 
 # matmul and conv precision from https://jax.readthedocs.io/en/latest/jax.lax.html#jax.lax.Precision
 # Options are "DEFAULT", "HIGH", "HIGHEST"
