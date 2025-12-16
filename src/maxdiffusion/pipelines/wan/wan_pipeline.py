@@ -652,6 +652,8 @@ class WanPipeline:
           negative_prompt_embeds=negative_prompt_embeds,
       )
 
+      jax.debug.print("prompt_embeds: shape={}, dytype={}, min={}, max={}, mean={}", prompt_embeds.shape, prompt_embeds.dtype, jnp.min(prompt_embeds), jnp.max(prompt_embeds), jnp.mean(prompt_embeds))
+
       num_channel_latents = self.transformer.config.in_channels
       if latents is None:
         latents = self.prepare_latents(
