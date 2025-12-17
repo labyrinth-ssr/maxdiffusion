@@ -39,8 +39,8 @@ from jaxtyping import Array
 
 def _log_stats(name: str, tensor: Array, step_state: dict, enabled: bool):
     """Emit deterministic debug stats with a running order index."""
-    if not enabled:
-        return
+    # if not enabled:
+    #     return
     idx = step_state["i"]
     step_state["i"] += 1
     jax.debug.print(
@@ -403,7 +403,7 @@ class Wan2DiT(nnx.Module):
         text_embeds: Array,
         timestep: Array,
         deterministic: bool = True,
-        debug: bool = False,
+        debug: bool = True,
     ) -> Array:
         """
         Forward pass of the Diffusion Transformer.
