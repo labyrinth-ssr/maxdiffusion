@@ -37,21 +37,21 @@ from jax.lax import Precision
 from jaxtyping import Array
 
 
-# def _log_stats(name: str, tensor: Array, step_state: dict, enabled: bool):
-#     """Emit deterministic debug stats with a running order index."""
-#     if not enabled:
-#         return
-#     idx = step_state["i"]
-#     step_state["i"] += 1
-#     jax.debug.print(
-#         "[{idx}] {name}: shape={shape}, min={min}, max={max}, mean={mean}",
-#         idx=idx,
-#         name=name,
-#         shape=tensor.shape,
-#         min=jnp.min(tensor),
-#         max=jnp.max(tensor),
-#         mean=jnp.mean(tensor),
-#     )
+def _log_stats(name: str, tensor: Array, step_state: dict, enabled: bool):
+    """Emit deterministic debug stats with a running order index."""
+    if not enabled:
+        return
+    idx = step_state["i"]
+    step_state["i"] += 1
+    jax.debug.print(
+        "[{idx}] {name}: shape={shape}, min={min}, max={max}, mean={mean}",
+        idx=idx,
+        name=name,
+        shape=tensor.shape,
+        min=jnp.min(tensor),
+        max=jnp.max(tensor),
+        mean=jnp.mean(tensor),
+    )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -422,19 +422,19 @@ class Wan2DiT(nnx.Module):
         # _log_stats("input_text", text_embeds, step_state, debug)
         # _log_stats("input_timestep", timestep, step_state, debug)
         text_embeds = self.text_proj(text_embeds)
-        # _log_stats("text_proj", text_embeds, step_state, debug)
+        _log_stats("text_proj", text_embeds, step_state, debug)
 
         # Get time embeddings
         # time_emb: [B, D] for FinalLayer
         # time_proj: [B, 6*D] for AdaLN in blocks
         time_emb, time_proj = self.time_embed(timestep)
-        # _log_stats("time_emb", time_emb, step_state, debug)
-        # _log_stats("time_proj", time_proj, step_state, debug)
+        _log_stats("time_emb", time_emb, step_state, debug)
+        _log_stats("time_proj", time_proj, step_state, debug)
 
         x = self.patch_embed(latents)
         b, t_out, h_out, w_out, d = x.shape
         x = x.reshape(b, t_out * h_out * w_out, d)
-        # _log_stats("patch_embed", x, step_state, debug)
+        _log_stats("patch_embed", x, step_state, debug)
 
         grid_sizes = (t_out, h_out, w_out)
 
@@ -445,15 +445,15 @@ class Wan2DiT(nnx.Module):
 
         for block_idx, block in enumerate(self.blocks):
             x = block(x, text_embeds, time_proj, rope_state=(rope_freqs, grid_sizes), deterministic=deterministic)
-            # _log_stats(f"block_{block_idx}_out", x, step_state, debug)
+            _log_stats(f"block_{block_idx}_out", x, step_state, debug)
 
         # Final projection to noise space
         x = self.final_layer(x, time_emb)  # [B, T*H*W, latent_output_dim]
-        # _log_stats("final_layer", x, step_state, debug)
+        _log_stats("final_layer", x, step_state, debug)
 
         # Reshape back to video format
         predicted_noise = self.unpatchify(x, grid_sizes)
-        # _log_stats("unpatchify", predicted_noise, step_state, debug)
+        _log_stats("unpatchify", predicted_noise, step_state, debug)
 
         return predicted_noise
 
