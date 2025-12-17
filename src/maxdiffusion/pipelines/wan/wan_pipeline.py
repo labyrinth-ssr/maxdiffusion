@@ -652,7 +652,8 @@ class WanPipeline:
           negative_prompt_embeds=negative_prompt_embeds,
       )
 
-      jax.debug.print("prompt_embeds: shape={}, dytype={}, min={}, max={}, mean={}", prompt_embeds.shape, prompt_embeds.dtype, jnp.min(prompt_embeds), jnp.max(prompt_embeds), jnp.mean(prompt_embeds))
+      print("prompt_embeds: shape={}, dytype={}, min={}, max={}, mean={}", prompt_embeds.shape, prompt_embeds.dtype, jnp.min(prompt_embeds), jnp.max(prompt_embeds), jnp.mean(prompt_embeds))
+      print("negative_prompt_embeds: shape={}, dytype={}, min={}, max={}, mean={}", negative_prompt_embeds.shape, negative_prompt_embeds.dtype, jnp.min(negative_prompt_embeds), jnp.max(negative_prompt_embeds), jnp.mean(negative_prompt_embeds))
 
       num_channel_latents = self.transformer.config.in_channels
       if latents is None:
@@ -665,6 +666,7 @@ class WanPipeline:
             num_frames=num_frames,
             num_channels_latents=num_channel_latents,
         )
+      print("latents: shape={}, dytype={}, min={}, max={}, mean={}", latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents))
 
       data_sharding = NamedSharding(self.mesh, P())
       # Using global_batch_size_to_train_on so not to create more config variables
@@ -703,7 +705,8 @@ class WanPipeline:
         latents_std = 1.0 / jnp.array(self.vae.latents_std).reshape(1, self.vae.z_dim, 1, 1, 1)
         latents = latents / latents_std + latents_mean
         latents = latents.astype(jnp.float32)
-
+    
+    print("Final latents: shape={}, dytype={}, min={}, max={}, mean={}", latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents))
     with self.mesh, nn_partitioning.axis_rules(self.config.logical_axis_rules):
       video = self.vae.decode(latents, self.vae_cache)[0]
 
@@ -711,6 +714,7 @@ class WanPipeline:
     video = jax.experimental.multihost_utils.process_allgather(video, tiled=True)
     video = torch.from_numpy(np.array(video.astype(dtype=jnp.float32))).to(dtype=torch.bfloat16)
     video = self.video_processor.postprocess_video(video, output_type="np")
+    print("Decoded video: shape={}, dytype={}, min={}, max={}, mean={}", video.shape, video.dtype, np.min(video), np.max(video), np.mean(video))
     return video
 
 
@@ -769,6 +773,9 @@ def run_inference(
         do_classifier_free_guidance=do_classifier_free_guidance,
         guidance_scale=guidance_scale,
     )
+    jax.debug.print("step: {}, t: {}, noise_pred: shape={}, dtype={}, min={}, max={}, mean={}", step, t, noise_pred.shape, noise_pred.dtype, jnp.min(noise_pred), jnp.max(noise_pred), jnp.mean(noise_pred))
+    jax.debug.print("step: {}, t: {}, latents: shape={}, dtype={}, min={}, max={}, mean={}", step, t, latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents))
 
     latents, scheduler_state = scheduler.step(scheduler_state, noise_pred, t, latents).to_tuple()
+    jax.debug.print("step: {}, t: {}, updated latents: shape={}, dtype={}, min={}, max={}, mean={}", step, t, latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents))
   return latents
