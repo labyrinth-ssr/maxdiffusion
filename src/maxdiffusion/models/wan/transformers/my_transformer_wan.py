@@ -557,8 +557,12 @@ class WanModelAdapter(nnx.Module):
         # Convert from channel-first to channel-last
         latents = jnp.transpose(hidden_states, (0, 2, 3, 4, 1))  # [B, T, H, W, C]
 
+        jax.debug.print("in dit, Latents shape: {}, min={},max={},mean={}, dtype={}", latents.shape, latents.min(), latents.max(), latents.mean(), latents.dtype)
+        jax.debug.print("in dit, Timestep shape: {}, min={},max={},mean={}, dtype={}", timestep.shape, timestep.min(), timestep.max(), timestep.mean(), timestep.dtype)
+        jax.debug.print("in dit, Encoder hidden states shape: {}, min={},max={},mean={}, dtype={}", encoder_hidden_states.shape, encoder_hidden_states.min(), encoder_hidden_states.max(), encoder_hidden_states.mean(), encoder_hidden_states.dtype)
         # Forward pass
         noise_pred = self.model.forward(latents, encoder_hidden_states, timestep, deterministic=True, debug=debug)
+        jax.debug.print("in dit, Noise pred shape: {}, min={},max={},mean={}, dtype={}", noise_pred.shape, noise_pred.min(), noise_pred.max(), noise_pred.mean(), noise_pred.dtype)
 
         # Convert back to channel-first
         noise_pred = jnp.transpose(noise_pred, (0, 4, 1, 2, 3))  # [B, C, T, H, W]
