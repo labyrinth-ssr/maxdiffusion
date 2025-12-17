@@ -730,12 +730,12 @@ def transformer_forward_pass(
     guidance_scale,
 ):
   wan_transformer = nnx.merge(graphdef, sharded_state, rest_of_state)
-  jax.debug.print("transformer_forward_pass: t={} latents: shape={}, dtype={}, min={}, max={}, mean={}", jnp.unique(timestep), latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents))
-  jax.debug.print("transformer_forward_pass: t={} prompt_embeds: shape={}, dtype={}, min={}, max={}, mean={}", jnp.unique(timestep), prompt_embeds.shape, prompt_embeds.dtype, jnp.min(prompt_embeds), jnp.max(prompt_embeds), jnp.mean(prompt_embeds))
+  jax.debug.print("transformer_forward_pass: t={} latents: shape={}, dtype={}, min={}, max={}, mean={}", jnp.mean(timestep), latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents))
+  jax.debug.print("transformer_forward_pass: t={} prompt_embeds: shape={}, dtype={}, min={}, max={}, mean={}", jnp.mean(timestep), prompt_embeds.shape, prompt_embeds.dtype, jnp.min(prompt_embeds), jnp.max(prompt_embeds), jnp.mean(prompt_embeds))
 
   noise_pred = wan_transformer(hidden_states=latents, timestep=timestep, encoder_hidden_states=prompt_embeds, debug=True)
 
-  jax.debug.print("transformer_forward_pass: t={} noise_pred: shape={}, dtype={}, min={}, max={}, mean={}", jnp.unique(timestep), noise_pred.shape, noise_pred.dtype, jnp.min(noise_pred), jnp.max(noise_pred), jnp.mean(noise_pred))
+  jax.debug.print("transformer_forward_pass: t={} noise_pred: shape={}, dtype={}, min={}, max={}, mean={}", jnp.mean(timestep), noise_pred.shape, noise_pred.dtype, jnp.min(noise_pred), jnp.max(noise_pred), jnp.mean(noise_pred))
   if do_classifier_free_guidance:
     bsz = latents.shape[0] // 2
     noise_uncond = noise_pred[bsz:]
