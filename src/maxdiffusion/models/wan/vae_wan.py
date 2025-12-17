@@ -46,7 +46,7 @@ class VAEConfig:
     These are fixed constants computed during VAE training.
     """
 
-    latent_mean: Tuple[float, ...] = (
+    latents_mean: Tuple[float, ...] = (
         -0.7571,
         -0.7089,
         -0.9113,
@@ -65,7 +65,7 @@ class VAEConfig:
         -0.2921,
     )
 
-    latent_std: Tuple[float, ...] = (
+    latents_std: Tuple[float, ...] = (
         2.8184,
         1.4541,
         2.3275,
@@ -563,8 +563,8 @@ class WanVAEDecoder(nnx.Module):
         # Store config tuples as Python values (not JAX arrays!)
         # They'll be converted to JAX arrays at runtime in decode()
         # This avoids ShapeDtypeStruct issues during nnx.eval_shape()
-        self.latent_mean_tuple = cfg.latent_mean
-        self.latent_std_tuple = cfg.latent_std
+        self.latents_mean = cfg.latents_mean
+        self.latents_std = cfg.latents_std
 
         # 1x1 conv projection
         self.conv2 = CausalConv3d(16, 16, kernel_size=(1, 1, 1), rngs=rngs)
@@ -590,9 +590,9 @@ class WanVAEDecoder(nnx.Module):
                     #    latents.shape, jnp.min(latents), jnp.max(latents), jnp.mean(latents), ordered=True)
 
         # # Convert Python tuples to JAX arrays at runtime (JIT treats them as static constants)
-        # latent_mean = jnp.array(self.latent_mean_tuple).reshape(1, 1, 1, 1, 16)
-        # latent_std = jnp.array(self.latent_std_tuple).reshape(1, 1, 1, 1, 16)
-        # z = latents * latent_std + latent_mean
+        # latents_mean = jnp.array(self.latents_mean).reshape(1, 1, 1, 1, 16)
+        # latents_std = jnp.array(self.latents_std).reshape(1, 1, 1, 1, 16)
+        # z = latents * latents_std + latents_mean
         z = latents
 
         # DEBUG: After denormalization
@@ -731,8 +731,8 @@ class WanVAEAdapter(nnx.Module):
             raise ValueError("Must provide either vae_decoder or (cfg, rngs)")
 
         # Add attributes expected by pipeline
-        self.latents_mean = _cfg.latent_mean  # Tuple of 16 floats
-        self.latents_std = _cfg.latent_std    # Tuple of 16 floats
+        self.latents_mean = _cfg.latents_mean  # Tuple of 16 floats
+        self.latents_std = _cfg.latents_std    # Tuple of 16 floats
         self.z_dim = 16  # Latent dimension
         self.temperal_downsample = [False, True, True]  # 2x temporal downsampling: 81 -> 21
 
@@ -757,11 +757,11 @@ class WanVAEAdapter(nnx.Module):
 
         # # Custom VAE does denormalization internally, but pipeline expects to do it
         # # So we need to RE-normalize before passing to decoder (which will denormalize again)
-        # latent_mean = jnp.array(self.latents_mean).reshape(1, 1, 1, 1, 16)
-        # latent_std = jnp.array(self.latents_std).reshape(1, 1, 1, 1, 16)
+        # latents_mean = jnp.array(self.latents_mean).reshape(1, 1, 1, 1, 16)
+        # latents_std = jnp.array(self.latents_std).reshape(1, 1, 1, 1, 16)
 
         # # Reverse the pipeline's denormalization: z_normalized = (z_denormalized - mean) / std
-        # latents_normalized = (latents - latent_mean) / latent_std
+        # latents_normalized = (latents - latents_mean) / latents_std
 
         # Decode (decoder will denormalize internally)
         video = self.decoder.decode(latents)
