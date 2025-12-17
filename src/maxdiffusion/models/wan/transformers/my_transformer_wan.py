@@ -433,6 +433,9 @@ class Wan2DiT(nnx.Module):
         _log_stats("time_emb", time_emb, step_state, debug)
         _log_stats("time_proj", time_proj, step_state, debug)
 
+        jax.debug.print("latents min: {}, max: {}, mean: {}", latents.min(), latents.max(), latents.mean())
+        jax.debug.print("patch embed weight, min: {}, max: {}", self.patch_embed.kernel.value.min(), self.patch_embed.kernel.value.max())
+
         x = self.patch_embed(latents)
         b, t_out, h_out, w_out, d = x.shape
         x = x.reshape(b, t_out * h_out * w_out, d)
