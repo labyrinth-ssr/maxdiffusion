@@ -372,7 +372,6 @@ class Wan2DiT(nnx.Module):
         # 3D Conv to patchify video latents
         # (T, H, W) → (T, H/2, W/2)
 
-        print(f"dtype: {cfg.dtype}, weights_dtype: {cfg.weights_dtype}, precision: {cfg.precision}, rngs: {rngs}")
         self.patch_embed = nnx.Conv(
             in_features=cfg.latent_input_dim,
             out_features=cfg.hidden_dim,
