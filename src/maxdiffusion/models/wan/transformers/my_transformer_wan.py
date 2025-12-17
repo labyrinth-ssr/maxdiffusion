@@ -366,6 +366,8 @@ class Wan2DiT(nnx.Module):
     def __init__(self, cfg: TransformerWanModelConfig, *, rngs: nnx.Rngs):
         self.cfg = cfg
 
+        print(f"cfg: {cfg}")
+
         # 3D Conv to patchify video latents
         # (T, H, W) → (T, H/2, W/2)
         self.patch_embed = nnx.Conv(

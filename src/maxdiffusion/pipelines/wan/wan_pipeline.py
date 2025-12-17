@@ -108,6 +108,7 @@ def create_sharded_logical_transformer(
     from ...models.wan.transformers import my_transformer_wan_load
     pretrained_path = wan_config.pop('_load_from_pretrained')
     cfg = wan_config['cfg']
+    print(f"cfg: {cfg}")
     max_logging.log(f"Loading custom WAN transformer from {pretrained_path}")
     wan_dit_model = my_transformer_wan_load.create_model_from_safe_tensors(
         pretrained_path,
