@@ -652,8 +652,8 @@ class WanPipeline:
           negative_prompt_embeds=negative_prompt_embeds,
       )
 
-      print("prompt_embeds: shape={}, dytype={}, min={}, max={}, mean={}", prompt_embeds.shape, prompt_embeds.dtype, jnp.min(prompt_embeds), jnp.max(prompt_embeds), jnp.mean(prompt_embeds))
-      print("negative_prompt_embeds: shape={}, dytype={}, min={}, max={}, mean={}", negative_prompt_embeds.shape, negative_prompt_embeds.dtype, jnp.min(negative_prompt_embeds), jnp.max(negative_prompt_embeds), jnp.mean(negative_prompt_embeds))
+      print("prompt_embeds: shape={}, dytype={}, min={}, max={}, mean={}".format(prompt_embeds.shape, prompt_embeds.dtype, jnp.min(prompt_embeds), jnp.max(prompt_embeds), jnp.mean(prompt_embeds)))
+      print("negative_prompt_embeds: shape={}, dytype={}, min={}, max={}, mean={}".format(negative_prompt_embeds.shape, negative_prompt_embeds.dtype, jnp.min(negative_prompt_embeds), jnp.max(negative_prompt_embeds), jnp.mean(negative_prompt_embeds)))
 
       num_channel_latents = self.transformer.config.in_channels
       if latents is None:
@@ -705,8 +705,8 @@ class WanPipeline:
         latents_std = 1.0 / jnp.array(self.vae.latents_std).reshape(1, self.vae.z_dim, 1, 1, 1)
         latents = latents / latents_std + latents_mean
         latents = latents.astype(jnp.float32)
-    
-    print("Final latents: shape={}, dytype={}, min={}, max={}, mean={}", latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents))
+
+    print("Final latents: shape={}, dytype={}, min={}, max={}, mean={}".format(latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents)))
     with self.mesh, nn_partitioning.axis_rules(self.config.logical_axis_rules):
       video = self.vae.decode(latents, self.vae_cache)[0]
 
@@ -714,7 +714,7 @@ class WanPipeline:
     video = jax.experimental.multihost_utils.process_allgather(video, tiled=True)
     video = torch.from_numpy(np.array(video.astype(dtype=jnp.float32))).to(dtype=torch.bfloat16)
     video = self.video_processor.postprocess_video(video, output_type="np")
-    print("Decoded video: shape={}, dytype={}, min={}, max={}, mean={}", video.shape, video.dtype, np.min(video), np.max(video), np.mean(video))
+    print("Decoded video: shape={}, dytype={}, min={}, max={}, mean={}".format(video.shape, video.dtype, np.min(video), np.max(video), np.mean(video)))
     return video
 
 
@@ -762,6 +762,8 @@ def run_inference(
     if do_classifier_free_guidance:
       latents = jnp.concatenate([latents] * 2)
     timestep = jnp.broadcast_to(t, latents.shape[0])
+
+    jax.debug.print("step: {}, prompt_embeds: shape={}, dtype={}, min={}, max={}, mean={}", step, prompt_embeds.shape, prompt_embeds.dtype, jnp.min(prompt_embeds), jnp.max(prompt_embeds), jnp.mean(prompt_embeds))
 
     noise_pred, latents = transformer_forward_pass(
         graphdef,
