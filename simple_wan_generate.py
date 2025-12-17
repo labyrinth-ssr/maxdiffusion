@@ -156,7 +156,7 @@ def decode_video(latents, vae_decoder):
 
     # Decode (VAE expects channel-last: B, T, H, W, C)
     latents_channel_last = jnp.transpose(latents, (0, 2, 3, 4, 1))
-    video = vae_decoder.decode(latents_channel_last, cache=None)[0]
+    video = vae_decoder.decode(latents_channel_last)[0]
 
     print(f"Decoded video shape: {video.shape}")
     return video
@@ -248,6 +248,7 @@ def main():
         args.model_path,
         mesh=None,
     )
+    wan_vae = vae_wan.WanVAEAdapter(vae_decoder=vae_decoder)
     print(f"✓ VAE decoder loaded")
 
     # 5. Load scheduler
@@ -288,7 +289,7 @@ def main():
     )
 
     # Decode to video
-    video = decode_video(latents, vae_decoder)
+    video = decode_video(latents, wan_vae)
 
     # Postprocess
     video = postprocess_video(video)
