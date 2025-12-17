@@ -367,6 +367,7 @@ class Wan2DiT(nnx.Module):
         self.cfg = cfg
 
         print(f"cfg: {cfg}")
+        jax.debug.print("dtype: {}, weights_dtype: {}, precision: {}, rngs: {}", cfg.dtype, cfg.weights_dtype, cfg.precision, rngs)
 
         # 3D Conv to patchify video latents
         # (T, H, W) → (T, H/2, W/2)
