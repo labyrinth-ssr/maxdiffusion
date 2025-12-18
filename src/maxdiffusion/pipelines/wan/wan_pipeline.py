@@ -55,7 +55,7 @@ def cast_with_exclusion(path, x, dtype_to_cast):
   path_str = ".".join(str(k.key) if isinstance(k, jax.tree_util.DictKey) else str(k) for k in path)
 
   if any(keyword in path_str.lower() for keyword in exclusion_keywords):
-    print("is_norm_path: ", path)
+    # print("is_norm_path: ", path)
     # Keep LayerNorm/GroupNorm weights and biases in full precision
     return x.astype(jnp.float32)
   else:
@@ -108,7 +108,7 @@ def create_sharded_logical_transformer(
     from ...models.wan.transformers import my_transformer_wan_load
     pretrained_path = wan_config.pop('_load_from_pretrained')
     cfg = wan_config['cfg']
-    print(f"cfg: {cfg}")
+    # print(f"cfg: {cfg}")
     max_logging.log(f"Loading custom WAN transformer from {pretrained_path}")
     wan_dit_model = my_transformer_wan_load.create_model_from_safe_tensors(
         pretrained_path,
@@ -653,8 +653,8 @@ class WanPipeline:
           negative_prompt_embeds=negative_prompt_embeds,
       )
 
-      print("prompt_embeds: shape={}, dytype={}, min={}, max={}, mean={}".format(prompt_embeds.shape, prompt_embeds.dtype, jnp.min(prompt_embeds), jnp.max(prompt_embeds), jnp.mean(prompt_embeds)))
-      print("negative_prompt_embeds: shape={}, dytype={}, min={}, max={}, mean={}".format(negative_prompt_embeds.shape, negative_prompt_embeds.dtype, jnp.min(negative_prompt_embeds), jnp.max(negative_prompt_embeds), jnp.mean(negative_prompt_embeds)))
+      # print("prompt_embeds: shape={}, dytype={}, min={}, max={}, mean={}".format(prompt_embeds.shape, prompt_embeds.dtype, jnp.min(prompt_embeds), jnp.max(prompt_embeds), jnp.mean(prompt_embeds)))
+      # print("negative_prompt_embeds: shape={}, dytype={}, min={}, max={}, mean={}".format(negative_prompt_embeds.shape, negative_prompt_embeds.dtype, jnp.min(negative_prompt_embeds), jnp.max(negative_prompt_embeds), jnp.mean(negative_prompt_embeds)))
 
       num_channel_latents = self.transformer.config.in_channels
       if latents is None:
@@ -667,7 +667,7 @@ class WanPipeline:
             num_frames=num_frames,
             num_channels_latents=num_channel_latents,
         )
-      print("latents: shape={}, dytype={}, min={}, max={}, mean={}", latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents))
+      # print("latents: shape={}, dytype={}, min={}, max={}, mean={}", latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents))
 
       data_sharding = NamedSharding(self.mesh, P())
       # Using global_batch_size_to_train_on so not to create more config variables
@@ -707,7 +707,7 @@ class WanPipeline:
         latents = latents / latents_std + latents_mean
         latents = latents.astype(jnp.float32)
 
-    print("Final latents: shape={}, dytype={}, min={}, max={}, mean={}".format(latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents)))
+    # print("Final latents: shape={}, dytype={}, min={}, max={}, mean={}".format(latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents)))
     with self.mesh, nn_partitioning.axis_rules(self.config.logical_axis_rules):
       video = self.vae.decode(latents, self.vae_cache)[0]
 
@@ -715,7 +715,7 @@ class WanPipeline:
     video = jax.experimental.multihost_utils.process_allgather(video, tiled=True)
     video = torch.from_numpy(np.array(video.astype(dtype=jnp.float32))).to(dtype=torch.bfloat16)
     video = self.video_processor.postprocess_video(video, output_type="np")
-    print("Decoded video: shape={}, dytype={}, min={}, max={}, mean={}".format(video.shape, video.dtype, np.min(video), np.max(video), np.mean(video)))
+    # print("Decoded video: shape={}, dytype={}, min={}, max={}, mean={}".format(video.shape, video.dtype, np.min(video), np.max(video), np.mean(video)))
     return video
 
 
@@ -731,12 +731,12 @@ def transformer_forward_pass(
     guidance_scale,
 ):
   wan_transformer = nnx.merge(graphdef, sharded_state, rest_of_state)
-  jax.debug.print("transformer_forward_pass: t={} latents: shape={}, dtype={}, min={}, max={}, mean={}", jnp.mean(timestep), latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents))
-  jax.debug.print("transformer_forward_pass: t={} prompt_embeds: shape={}, dtype={}, min={}, max={}, mean={}", jnp.mean(timestep), prompt_embeds.shape, prompt_embeds.dtype, jnp.min(prompt_embeds), jnp.max(prompt_embeds), jnp.mean(prompt_embeds))
+  # jax.debug.print("transformer_forward_pass: t={} latents: shape={}, dtype={}, min={}, max={}, mean={}", jnp.mean(timestep), latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents))
+  # jax.debug.print("transformer_forward_pass: t={} prompt_embeds: shape={}, dtype={}, min={}, max={}, mean={}", jnp.mean(timestep), prompt_embeds.shape, prompt_embeds.dtype, jnp.min(prompt_embeds), jnp.max(prompt_embeds), jnp.mean(prompt_embeds))
 
   noise_pred = wan_transformer(hidden_states=latents, timestep=timestep, encoder_hidden_states=prompt_embeds, debug=True)
 
-  jax.debug.print("transformer_forward_pass: t={} noise_pred: shape={}, dtype={}, min={}, max={}, mean={}", jnp.mean(timestep), noise_pred.shape, noise_pred.dtype, jnp.min(noise_pred), jnp.max(noise_pred), jnp.mean(noise_pred))
+  # jax.debug.print("transformer_forward_pass: t={} noise_pred: shape={}, dtype={}, min={}, max={}, mean={}", jnp.mean(timestep), noise_pred.shape, noise_pred.dtype, jnp.min(noise_pred), jnp.max(noise_pred), jnp.mean(noise_pred))
   if do_classifier_free_guidance:
     bsz = latents.shape[0] // 2
     noise_uncond = noise_pred[bsz:]
@@ -769,7 +769,7 @@ def run_inference(
       latents = jnp.concatenate([latents] * 2)
     timestep = jnp.broadcast_to(t, latents.shape[0])
 
-    jax.debug.print("step: {}, prompt_embeds: shape={}, dtype={}, min={}, max={}, mean={}", step, prompt_embeds.shape, prompt_embeds.dtype, jnp.min(prompt_embeds), jnp.max(prompt_embeds), jnp.mean(prompt_embeds))
+    # jax.debug.print("step: {}, prompt_embeds: shape={}, dtype={}, min={}, max={}, mean={}", step, prompt_embeds.shape, prompt_embeds.dtype, jnp.min(prompt_embeds), jnp.max(prompt_embeds), jnp.mean(prompt_embeds))
 
     noise_pred, latents = transformer_forward_pass(
         graphdef,
@@ -781,9 +781,9 @@ def run_inference(
         do_classifier_free_guidance=do_classifier_free_guidance,
         guidance_scale=guidance_scale,
     )
-    jax.debug.print("step: {}, t: {}, noise_pred: shape={}, dtype={}, min={}, max={}, mean={}", step, t, noise_pred.shape, noise_pred.dtype, jnp.min(noise_pred), jnp.max(noise_pred), jnp.mean(noise_pred))
-    jax.debug.print("step: {}, t: {}, latents: shape={}, dtype={}, min={}, max={}, mean={}", step, t, latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents))
+    # jax.debug.print("step: {}, t: {}, noise_pred: shape={}, dtype={}, min={}, max={}, mean={}", step, t, noise_pred.shape, noise_pred.dtype, jnp.min(noise_pred), jnp.max(noise_pred), jnp.mean(noise_pred))
+    # jax.debug.print("step: {}, t: {}, latents: shape={}, dtype={}, min={}, max={}, mean={}", step, t, latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents))
 
     latents, scheduler_state = scheduler.step(scheduler_state, noise_pred, t, latents).to_tuple()
-    jax.debug.print("step: {}, t: {}, updated latents: shape={}, dtype={}, min={}, max={}, mean={}", step, t, latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents))
+    # jax.debug.print("step: {}, t: {}, updated latents: shape={}, dtype={}, min={}, max={}, mean={}", step, t, latents.shape, latents.dtype, jnp.min(latents), jnp.max(latents), jnp.mean(latents))
   return latents

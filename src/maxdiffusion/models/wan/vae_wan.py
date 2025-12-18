@@ -662,8 +662,8 @@ class WanVAEDecoder(nnx.Module):
             remaining_flat = remaining_outputs.transpose(0, 2, 1, 3, 4, 5).reshape(
                 t_minus_1 * t_out_per_frame, b, h_out, w_out, c
             )
-            print(f"remaining flat shape:{remaining_flat.shape}")
-            print(f"remaining flat mean:{remaining_flat[:, 0, :, 235:, :].mean()} ")
+            # print(f"remaining flat shape:{remaining_flat.shape}")
+            # print(f"remaining flat mean:{remaining_flat[:, 0, :, 235:, :].mean()} ")
 
             # Concatenate along time dimension: [1+T-1*4, B, H, W, 3]
             # Concatenate first frame with remaining frames
@@ -673,7 +673,7 @@ class WanVAEDecoder(nnx.Module):
 
         # DEBUG: Before clipping
         # jax.debug.print("[VAE_WAN DECODE] Before clip: shape={}, min={:.4f}, max={:.4f}, mean={:.4f}",
-                    #    x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
+        #                x.shape, jnp.min(x), jnp.max(x), jnp.mean(x), ordered=True)
 
         # Clamp to [-1, 1]
         x = jnp.clip(x, -1.0, 1.0)
