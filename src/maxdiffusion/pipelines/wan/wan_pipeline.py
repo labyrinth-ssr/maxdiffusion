@@ -39,6 +39,7 @@ import html
 import re
 import torch
 import qwix
+import os
 
 
 def cast_with_exclusion(path, x, dtype_to_cast):
@@ -683,6 +684,9 @@ class WanPipeline:
       )
 
       graphdef, state, rest_of_state = nnx.split(self.transformer, nnx.Param, ...)
+
+      print(f"XLA flags: {os.environ.get('XLA_FLAGS', 'None')}")
+
 
       p_run_inference = partial(
           run_inference,
